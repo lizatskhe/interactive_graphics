@@ -116,6 +116,8 @@ bool IntersectRay( inout HitInfo hit, Ray ray )
 // If the ray does not hit a sphere, returns the environment color.
 vec4 RayTracer(Ray ray)
 {
+    ray.dir = normalize(ray.dir); 
+
     HitInfo hit;
     if (IntersectRay(hit, ray)) {
         vec3 view = normalize(-ray.dir);
@@ -128,24 +130,29 @@ vec4 RayTracer(Ray ray)
             if (k_s.r + k_s.g + k_s.b <= 0.0) break;
 
             Ray reflectionRay;
-            reflectionRay.pos = hit.position + hit.normal * 0.01; // offset to avoid self-intersection
-            reflectionRay.dir = reflect(ray.dir, hit.normal);
+            reflectionRay.pos = hit.position + hit.normal * 0.01; // increased offset to prevent self-hit
+            reflectionRay.dir = normalize(reflect(ray.dir, hit.normal)); // ensure normalized
 
             HitInfo reflectionHit;
             if (IntersectRay(reflectionHit, reflectionRay)) {
                 vec3 reflectionView = normalize(-reflectionRay.dir);
-                clr += k_s * Shade(reflectionHit.mtl, reflectionHit.position, reflectionHit.normal, reflectionView);
-                k_s *= reflectionHit.mtl.k_s; // reflection coefficient
-                hit = reflectionHit; 
+                vec3 reflectionColor = Shade(reflectionHit.mtl, reflectionHit.position, reflectionHit.normal, reflectionView);
+                clr += k_s * reflectionColor;
+
+                // update for next bounce
+                k_s *= reflectionHit.mtl.k_s;
+                hit = reflectionHit;
+                ray = reflectionRay;
             } else {
-                clr += k_s * textureCube(envMap, reflectionRay.dir.xzy).rgb;
-                break; // no reflections left
+                clr += k_s * textureCube(envMap, reflectionRay.dir).rgb; 
+                break;
             }
         }
 
         return vec4(clr, 1.0);
     } else {
-        return vec4(textureCube(envMap, ray.dir.xzy).rgb, 0.0); // env colour
+        return vec4(textureCube(envMap, ray.dir).rgb, 0.0); 
     }
 }
+
 `;
