@@ -170,48 +170,84 @@ class MeshDrawer {
 // Its job is to advance the simulation for the given time step duration dt.
 // It updates the given positions and velocities.
 function SimTimeStep(dt, positions, velocities, springs, springStiffness, damping, particleMass, gravity, restitution) {
-    // loop through each spring to compute spring forces
-    const forces = positions.map(() => new Vec3(0, 0, 0)); // zero vectors
-    for (const spring of springs) {
-        const p0 = positions[spring.p0];
-        const p1 = positions[spring.p1];
-        const v0 = velocities[spring.p0];
-        const v1 = velocities[spring.p1];
+	const forces = Array(positions.length);
 
-        const springVector = p1.sub(p0);
-        const springLength = springVector.len();
+	for (let i = 0; i < forces.length; i++) {
+		forces[i] = gravity.mul(particleMass); 
+	}
 
-        const springForce = springVector
-            .unit()
-            .mul(springStiffness * (springLength - spring.rest));
+	for (const spring of springs) {
+		const i = spring.p0, j = spring.p1, rest = spring.rest;
 
-        const relativeVelocity = v1.sub(v0);
-        const dampingForce = springVector
-            .unit()
-            .mul(damping * relativeVelocity.dot(springVector.unit()));
+		const deltaPos = positions[i].sub(positions[j]);
+		const d = deltaPos.unit();
+		const l = deltaPos.len();
 
-        // add forces to the respective particles
-        forces[spring.p0].inc(springForce).inc(dampingForce.mul(-1));
-        forces[spring.p1].inc(springForce.mul(-1)).inc(dampingForce);
-    }
+		const springForce = d.mul(springStiffness * (rest - l));
+		const velDiff = velocities[i].sub(velocities[j]);
+		const dampingForce = d.mul(-damping * velDiff.dot(d));
 
-    // loop through each particle to update positions and velocities
-    for (let i = 0; i < positions.length; i++) {
-        const netForce = forces[i].add(gravity.mul(particleMass));
+		forces[i].inc(springForce).inc(dampingForce);
+		forces[j].inc(springForce.mul(-1)).inc(dampingForce.mul(-1));
+	}
 
-        velocities[i].inc(netForce.mul(dt / particleMass));
+	for (let i = 0; i < positions.length; i++) {
+		if (massSpring.selVert === i) continue;
 
-        positions[i].inc(velocities[i].mul(dt));
+		const a = forces[i].div(particleMass);
+		velocities[i] = velocities[i].add(a.mul(dt));
+		positions[i] = positions[i].add(velocities[i].mul(dt));
+	}
 
-        for (const axis of ['x', 'y', 'z']) {
-            if (positions[i][axis] < -1) {
-                positions[i][axis] = -1;
-                velocities[i][axis] *= -restitution;
-            } else if (positions[i][axis] > 1) {
-                positions[i][axis] = 1;
-                velocities[i][axis] *= -restitution;
-            }
-        }
-    }
+	for (let i = 0; i < positions.length; i++) {
+		for (const axis of ['x', 'y', 'z']) {
+			if (positions[i][axis] < -1.0) {
+				const h = -1.0 - positions[i][axis];
+				positions[i][axis] = restitution * h - 1.0;
+				velocities[i][axis] = -velocities[i][axis] * restitution;
+			}
+			if (positions[i][axis] > 1.0) {
+				const h = positions[i][axis] - 1.0;
+				positions[i][axis] = 1.0 - restitution * h;
+				velocities[i][axis] = -velocities[i][axis] * restitution;
+			}
+		}
+	}
+
 }
+
+
+var objVS = `
+	attribute vec3 pos;
+	attribute vec2 txc;
+	varying vec2 texCoord;
+
+	uniform mat4 mvp;
+	uniform float swapYZ;
+
+	void main() {
+		vec3 position = pos;
+		if (swapYZ > 0.5) {
+			position = vec3(pos.x, pos.z, pos.y);
+		}
+		gl_Position = mvp * vec4(position, 1.0);
+		texCoord = txc;
+	}
+`;
+
+
+
+var objFS = `
+	precision mediump float;
+
+	varying vec2 texCoord;
+	uniform sampler2D tex;
+	uniform float usingTexture;
+
+	void main() {
+		vec4 texColor = texture2D(tex, texCoord);
+		vec4 fallbackColor = vec4(1.0, gl_FragCoord.z * gl_FragCoord.z, 0.0, 1.0);
+		gl_FragColor = mix(fallbackColor, texColor, step(0.5, usingTexture));
+	}
+`;
 
