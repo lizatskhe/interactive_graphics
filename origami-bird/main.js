@@ -73,7 +73,7 @@ function createPaperGeometry(subdivisions = 10) {
   };
 }
 
-let folds = [
+let manualFolds = [
   {
     axis: [1, 0, 0],        // fold around X
     pivot: [0, 0, 0],       // fold origin
@@ -159,10 +159,11 @@ async function main() {
     foldAngle: gl.getUniformLocation(shaderProgram, "uFoldAngle"),
   };
 
+  gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
 
   const { positions, normals } = createPaperGeometry(20);
   const originalPositions = new Float32Array(positions); // copy for reference
-  const folds = createFolds(positions, 20);
+  const folds = createFolds(originalPositions, 20);
   console.log("Folds created:", folds.length);
   console.log("First fold:", folds[0]);
 
@@ -192,15 +193,17 @@ async function main() {
 
     if (currentFoldIndex < folds.length) {
       const fold = folds[currentFoldIndex];
-      const deltaAngle = fold.speed * deltaTime; // approx. 60 FPS
-      const remaining = fold.targetAngle - fold.angle;
-      const step = Math.sign(remaining) * Math.min(Math.abs(remaining), deltaAngle);
+      if (fold) {
+        const deltaAngle = fold.speed * deltaTime;
+        const remaining = fold.targetAngle - fold.angle;
+        const step = Math.sign(remaining) * Math.min(Math.abs(remaining), deltaAngle);
 
-      fold.angle += step;
+        fold.angle += step;
 
-      if (Math.abs(fold.angle - fold.targetAngle) < 0.01) {
-        fold.angle = fold.targetAngle;
-        currentFoldIndex++;
+        if (Math.abs(fold.angle - fold.targetAngle) < 0.01) {
+          fold.angle = fold.targetAngle;
+          currentFoldIndex++;
+        }
       }
     }
 
@@ -214,6 +217,21 @@ async function main() {
     const modelViewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.2, -1.5]);
     glMatrix.mat4.rotateY(modelViewMatrix, modelViewMatrix, time * 0.2);
+    
+    const viewMatrix = glMatrix.mat4.create();
+    glMatrix.mat4.invert(viewMatrix, modelViewMatrix);
+
+    const lightWorldPos = glMatrix.vec3.fromValues(2, 2, 2);
+    const lightViewPos = glMatrix.vec3.create();
+    glMatrix.vec3.transformMat4(lightViewPos, lightWorldPos, viewMatrix);
+
+    const cameraWorldPos = glMatrix.vec3.fromValues(0, 0, 0);
+    const cameraViewPos = glMatrix.vec3.create();
+    glMatrix.vec3.transformMat4(cameraViewPos, cameraWorldPos, viewMatrix);
+
+    gl.uniform3fv(uniformLocations.lightPos, lightViewPos);
+    gl.uniform3fv(uniformLocations.viewPos, cameraViewPos);
+
 
     const normalMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(normalMatrix, modelViewMatrix);
@@ -224,7 +242,6 @@ async function main() {
 
     for (const fold of folds) {
       for (let idxCoord of fold.indices) {
-        const idxVertex = idxCoord / 3;
         const pos = glMatrix.vec3.fromValues(
           originalPositions[idxCoord + 0],
           originalPositions[idxCoord + 1],
@@ -242,10 +259,6 @@ async function main() {
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, transformedPositions, gl.DYNAMIC_DRAW);
-
-
-    // bind positions
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.position);
 
@@ -259,20 +272,14 @@ async function main() {
     gl.uniformMatrix4fv(uniformLocations.modelView, false, modelViewMatrix);
     gl.uniformMatrix4fv(uniformLocations.normalMatrix, false, normalMatrix);
 
-    gl.uniform3fv(uniformLocations.lightPos, [2, 2, 2]);
     gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
-    gl.uniform3fv(uniformLocations.baseColor, [0.8, 0.7, 0.6]);
 
+    const r = (Math.sin(time) + 1) / 2;  // oscillates 0 to 1
+    const g = 0.5;
+    const b = (Math.cos(time) + 1) / 2;
 
-    if (currentFoldIndex < folds.length) {
-      const f = folds[currentFoldIndex];
-      // gl.uniform3fv(uniformLocations.foldAxis, new Float32Array(f.axis));
-      // gl.uniform3fv(uniformLocations.foldOrigin, new Float32Array(f.pivot));
-      // gl.uniform1f(uniformLocations.foldAngle, f.angle);
-    } else {
-      // No fold, reset angle
-      gl.uniform1f(uniformLocations.foldAngle, 0.0);
-    }
+    gl.uniform3fv(uniformLocations.baseColor, [r, g, b]);
+
 
 
     // draw
