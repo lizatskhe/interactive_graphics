@@ -47,29 +47,45 @@ void main() {
   vec3 lightDir = normalize(uLightPosition - vPosition);
   vec3 viewDir = normalize(uViewPosition - vPosition);
 
-  // lighting terms
-  float ambientStrength = 0.2;
+
+  // calculate dot product of normal and light direction
+  float NdotL = dot(normal, lightDir);
+
+  // ambient light fixed minimum for dark areas
+  float ambientStrength = 0.15;
   vec3 ambient = ambientStrength * uLightColor;
 
-  float diff = max(dot(normal, lightDir), 0.0);
-  vec3 diffuse = diff * uLightColor;
+  // diffuse with stronger contrast: clamp at 0 and sharpen shadows
+  float diffuseFactor = clamp(NdotL, 0.0, 1.0);
 
+  // sharpen the shadow edges by squaring diffuse factor to exaggerate difference
+  diffuseFactor = pow(diffuseFactor, 3.0);
+
+  vec3 diffuse = diffuseFactor * uLightColor;
+
+  // specular remains
   float specularStrength = 0.3;
   vec3 halfwayDir = normalize(lightDir + viewDir);
   float spec = pow(max(dot(normal, halfwayDir), 0.0), 16.0);
   vec3 specular = specularStrength * spec * uLightColor;
 
+  // combine lighting with base color
   vec3 litColor = (ambient + diffuse + specular) * uBaseColor;
 
-  // paper-like grain using fbm noise on screen coords
+  // rim glow for edges
+  float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+  rim = smoothstep(0.0, 0.3, rim);
+  vec3 rimColor = vec3(1.0, 1.0, 0.6);
+  vec3 glow = rim * rimColor * 0.3;
+
+  // paper grain noise
   float grain = fbm(gl_FragCoord.xy * 0.05);
   float grainStrength = 0.15;
 
-  // subtle color variation to simulate paper fibers
-  vec3 paperTint = vec3(0.95, 0.92, 0.85); // soft off-white
+  vec3 paperTint = vec3(0.95, 0.92, 0.85);
   vec3 colorVariation = mix(paperTint, litColor, 0.6);
 
-  vec3 finalColor = mix(colorVariation, litColor, 1.0 - grainStrength) + grainStrength * grain * 0.15;
+  vec3 finalColor = colorVariation + glow + grainStrength * grain * 0.15;
 
   gl_FragColor = vec4(finalColor, 1.0);
 }

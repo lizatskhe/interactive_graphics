@@ -163,6 +163,7 @@ async function main() {
     foldAxis: gl.getUniformLocation(shaderProgram, "uFoldAxis"),
     foldOrigin: gl.getUniformLocation(shaderProgram, "uFoldOrigin"),
     foldAngle: gl.getUniformLocation(shaderProgram, "uFoldAngle"),
+    viewPos: gl.getUniformLocation(shaderProgram, "uViewPos"),
   };
 
   gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
@@ -278,12 +279,13 @@ async function main() {
 
     gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
 
-    const r = (Math.sin(time) + 1) / 2;  // oscillates 0 to 1
-    const g = 0.5;
-    const b = (Math.cos(time) + 1) / 2;
+    // const r = (Math.sin(time) + 1) / 2;  // oscillates 0 to 1
+    // const g = 0.5;
+    // const b = (Math.cos(time) + 1) / 2;
 
-    gl.uniform3fv(uniformLocations.baseColor, [r, g, b]);
+    // gl.uniform3fv(uniformLocations.baseColor, [r, g, b]);
 
+    gl.uniform3fv(uniformLocations.baseColor, [0, 51, 0]);
 
 
     // draw
