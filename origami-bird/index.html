@@ -4,8 +4,16 @@
   <meta charset="UTF-8">
   <title>origami bird</title>
   <style>
-    body { margin: 0; }
-    canvas { display: block; width: 100vw; height: 100vh; }
+    body, html {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: linear-gradient(to top, #d0b9f6, #f8c4e4); /* soft sunrise colors */
+    }
+
+    canvas {
+      display: block; width: 100vw; height: 100vh;; /* removes default inline spacing */
+    }
   </style>
 </head>
 <body>

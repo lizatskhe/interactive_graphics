@@ -1,7 +1,13 @@
 console.log("starting");
 
 const canvas = document.getElementById("glcanvas");
-const gl = canvas.getContext("webgl");
+const gl = canvas.getContext("webgl", { alpha: true });
+gl.clearColor(0.0, 0.0, 0.0, 0.0); // transparent black
+gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+gl.viewport(0, 0, canvas.width, canvas.height);
+
 
 // load shaders
 async function loadShaderSource(url) {
@@ -187,8 +193,6 @@ async function main() {
     previousTime = time;
 
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0.9, 0.95, 1.0, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     console.log(`Fold ${currentFoldIndex} angle: ${folds[currentFoldIndex]?.angle.toFixed(3)}`);
 
     if (currentFoldIndex < folds.length) {
