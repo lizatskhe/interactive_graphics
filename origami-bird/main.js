@@ -261,9 +261,9 @@ async function main() {
 
     // camera + model
     const modelViewMatrix = glMatrix.mat4.create();
-    glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.1, -2.5]);
+    glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, 0.2, -1]);
     glMatrix.mat4.rotateY(modelViewMatrix, modelViewMatrix, time * 0.2);
-    glMatrix.mat4.rotateX(modelViewMatrix, modelViewMatrix, -0.2);
+    // glMatrix.mat4.rotateX(modelViewMatrix, modelViewMatrix, -0.9);
 
     const viewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(viewMatrix, modelViewMatrix);
