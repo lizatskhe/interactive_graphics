@@ -112,6 +112,53 @@ function createPaperGeometry(subdivisions = 10) {
   };
 }
 
+function createShadowPlane() {
+  const positions = [
+    -2, -0.5, -2, 2, -0.5, -2, 2, -0.5, 2,
+    -2, -0.5, -2, 2, -0.5, 2, -2, -0.5, 2
+  ];
+
+  const normals = [
+    0, 1, 0, 0, 1, 0, 0, 1, 0,
+    0, 1, 0, 0, 1, 0, 0, 1, 0
+  ];
+
+  return {
+    positions: new Float32Array(positions),
+    normals: new Float32Array(normals),
+  };
+}
+
+function createShadowVertices(originalPositions, transformedPositions, lightPos) {
+  const shadowPositions = [];
+  const planeY = -0.49; // slightly above the shadow plane to avoid z-fighting
+
+  for (let i = 0; i < transformedPositions.length; i += 3) {
+    const vertex = [
+      transformedPositions[i],
+      transformedPositions[i + 1],
+      transformedPositions[i + 2]
+    ];
+
+    // project vertex onto the shadow plane using light position
+    const lightToVertex = [
+      vertex[0] - lightPos[0],
+      vertex[1] - lightPos[1],
+      vertex[2] - lightPos[2]
+    ];
+
+    // find intersection with y = planeY plane
+    const t = (planeY - lightPos[1]) / lightToVertex[1];
+
+    const shadowX = lightPos[0] + t * lightToVertex[0];
+    const shadowZ = lightPos[2] + t * lightToVertex[2];
+
+    shadowPositions.push(shadowX, planeY, shadowZ);
+  }
+
+  return new Float32Array(shadowPositions);
+}
+
 
 // paper plane folding 
 let manualFolds = [
@@ -236,6 +283,10 @@ async function main() {
   const { positions, normals } = createPaperGeometry(20);
   const originalPositions = new Float32Array(positions); // copy for reference
   const folds = createFolds(originalPositions, 20);
+
+  const shadowPlane = createShadowPlane();
+
+
   console.log("Folds created:", folds.length);
   console.log("First fold:", folds[0]);
 
@@ -247,6 +298,17 @@ async function main() {
   const normalBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
+
+  const shadowPlanePositionBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlanePositionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, shadowPlane.positions, gl.STATIC_DRAW);
+
+  const shadowPlaneNormalBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlaneNormalBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, shadowPlane.normals, gl.STATIC_DRAW);
+
+  // Shadow object buffers
+  const shadowPositionBuffer = gl.createBuffer();
 
   gl.enable(gl.DEPTH_TEST);
 
@@ -300,12 +362,6 @@ async function main() {
     }
 
 
-
-
-
-    gl.viewport(0, 0, canvas.width, canvas.height);
-
-
     // perspective projection
     const aspect = canvas.width / canvas.height;
     const projectionMatrix = glMatrix.mat4.create();
@@ -315,12 +371,16 @@ async function main() {
     const modelViewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.1, -1]);
     glMatrix.mat4.rotateY(modelViewMatrix, modelViewMatrix, time * 0.2);
-    // glMatrix.mat4.rotateX(modelViewMatrix, modelViewMatrix, -0.9);
 
     const viewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(viewMatrix, modelViewMatrix);
 
-    const lightWorldPos = glMatrix.vec3.fromValues(2, 2, 2);
+
+    const lightWorldPos = glMatrix.vec3.fromValues(
+      2 * Math.cos(time * 0.5),
+      2 + Math.sin(time * 0.3),
+      2 * Math.sin(time * 0.5)
+    );
     const lightViewPos = glMatrix.vec3.create();
     glMatrix.vec3.transformMat4(lightViewPos, lightWorldPos, viewMatrix);
 
@@ -368,6 +428,52 @@ async function main() {
       }
     }
 
+    // set uniforms
+    gl.uniformMatrix4fv(uniformLocations.projection, false, projectionMatrix);
+    gl.uniformMatrix4fv(uniformLocations.modelView, false, modelViewMatrix);
+    gl.uniformMatrix4fv(uniformLocations.normalMatrix, false, normalMatrix);
+
+    gl.uniform3fv(uniformLocations.lightPos, lightWorldPos);
+    gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
+    gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
+
+    // render shadow plane 
+    gl.uniform1i(uniformLocations.isShadow, 0);
+    gl.uniform3fv(uniformLocations.baseColor, [0.3, 0.3, 0.3]); // dark ground
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlanePositionBuffer);
+    gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attribLocations.position);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlaneNormalBuffer);
+    gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attribLocations.normal);
+
+    gl.drawArrays(gl.TRIANGLES, 0, shadowPlane.positions.length / 3);
+
+    // render paper shadow
+    gl.uniform1i(uniformLocations.isShadow, 1);
+    gl.uniform3fv(uniformLocations.baseColor, [0.1, 0.1, 0.1]); // dark shadow
+
+    const shadowPositions = createShadowVertices(originalPositions, transformedPositions, lightWorldPos);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, shadowPositions, gl.DYNAMIC_DRAW);
+    gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attribLocations.position);
+
+    // use paper normals for shadow (pointing up)
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attribLocations.normal);
+
+    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3);
+
+    // render the paper object
+    gl.uniform1i(uniformLocations.isShadow, 0);
+    gl.uniform3fv(uniformLocations.baseColor, [0.9, 0.85, 0.8]);
+
+
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, transformedPositions, gl.DYNAMIC_DRAW);
@@ -378,29 +484,6 @@ async function main() {
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.normal);
-
-    // set uniforms
-    gl.uniformMatrix4fv(uniformLocations.projection, false, projectionMatrix);
-    gl.uniformMatrix4fv(uniformLocations.modelView, false, modelViewMatrix);
-    gl.uniformMatrix4fv(uniformLocations.normalMatrix, false, normalMatrix);
-
-    // gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
-
-    // const r = (Math.sin(time) + 1) / 2;  // oscillates 0 to 1
-    // const g = 0.5;
-    // const b = (Math.cos(time) + 1) / 2;
-
-    // gl.uniform3fv(uniformLocations.baseColor, [r, g, b]);
-
-    gl.uniform3fv(uniformLocations.baseColor, [40, 10, 0]);
-
-    // gl.uniform3fv(uniformLocations.baseColor, [0.0, 0.4, 1.0]);
-
-    gl.uniform3fv(uniformLocations.lightPos, [2, 2, 2]);
-    gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
-    // gl.uniform3fv(uniformLocations.baseColor, [0.9, 0.9, 0.95]); // Paper white
-    gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
-
 
 
 
