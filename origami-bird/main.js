@@ -11,10 +11,20 @@ gl.viewport(0, 0, canvas.width, canvas.height);
 let isFolding = false;
 
 function startFolding() {
-  console.log("Starting folding animation");
+  console.log("starting boat folding");
   isFolding = true;
+  currentFoldStep = 0;
+  lastStepTime = 0;
+
   for (let fold of manualFolds) {
     fold.angle = 0;
+    fold.active = false;
+  }
+
+  // activate first fold
+  if (manualFolds.length > 0) {
+    manualFolds[0].active = true;
+    console.log("step 1: folding paper in half");
   }
 }
 
@@ -103,26 +113,53 @@ function createPaperGeometry(subdivisions = 10) {
 }
 
 
-
+// paper boat folding 
 let manualFolds = [
-  {
-    axis: [1, 0, 0], // fold around X-axis
-    pivot: [0, 0, 0], // fold around center
-    angle: 0,
-    targetAngle: Math.PI / 4,
-    speed: 2.0,
-    condition: (pos) => pos[2] > 0  // only fold top half
-  },
+  // step 1: fold in half horizontally
   {
     axis: [1, 0, 0],
     pivot: [0, 0, 0],
     angle: 0,
-    targetAngle: -Math.PI / 4,
-    speed: 2.0,
-    condition: (pos) => pos[2] < 0  // only fold bottom half
+    targetAngle: Math.PI,
+    speed: 1.5,
+    condition: (pos) => pos[2] > 0,
+    active: false
+  },
+  // step 2: fold top-left corner (adjust condition)
+  {
+    axis: [0, 0, 1],
+    pivot: [-0.25, 0, 0.25],
+    angle: 0,
+    targetAngle: Math.PI / 3,
+    speed: 1.5,
+    condition: (pos) => pos[0] < -0.1 && pos[2] > 0.1, // ssimplified condition
+    active: false
+  },
+  // step 3: fold top-right corner (adjust condition)
+  {
+    axis: [0, 0, 1],
+    pivot: [0.25, 0, 0.25],
+    angle: 0,
+    targetAngle: -Math.PI / 3,
+    speed: 1.5,
+    condition: (pos) => pos[0] > 0.1 && pos[2] > 0.1, // simplified condition
+    active: false
+  },
+  // step 4: fold bottom flap up
+  {
+    axis: [1, 0, 0],
+    pivot: [0, 0, -0.35],
+    angle: 0,
+    targetAngle: Math.PI / 2,
+    speed: 1.5,
+    condition: (pos) => pos[2] < -0.2 && Math.abs(pos[0]) < 0.4,
+    active: false
   }
 ];
 
+let currentFoldStep = 0;
+let stepDelay = 1000; // 1 second delay between steps
+let lastStepTime = 0;
 
 let currentFoldIndex = 0;
 
@@ -223,27 +260,42 @@ async function main() {
 
 
     if (isFolding) {
-      console.log("folding...");
-      let allDone = true;
+      let allCurrentStepsDone = true;
 
-      for (let fold of manualFolds) {
+      // only animate currently active folds
+      for (let i = 0; i < manualFolds.length; i++) {
+        const fold = manualFolds[i];
+
+        if (!fold.active) continue;
+
         const deltaAngle = fold.speed * deltaTime;
         const remaining = fold.targetAngle - fold.angle;
         const step = Math.sign(remaining) * Math.min(Math.abs(remaining), deltaAngle);
         fold.angle += step;
 
         if (Math.abs(fold.angle - fold.targetAngle) > 0.01) {
-          allDone = false;
+          allCurrentStepsDone = false;
         } else {
           fold.angle = fold.targetAngle; // snap if close
         }
-
-        console.log(`Fold angle: ${fold.angle.toFixed(3)}, target: ${fold.targetAngle.toFixed(3)}`);
       }
 
-      if (allDone) {
-        console.log("folding complete");
-        isFolding = false; // stop updating once all folds are done
+      // if current step is done, move to next step after delay
+      if (allCurrentStepsDone) {
+        if (lastStepTime === 0) {
+          lastStepTime = time;
+        } else if (time - lastStepTime > stepDelay / 1000) { // convert ms to seconds
+          currentFoldStep++;
+
+          if (currentFoldStep < manualFolds.length) {
+            manualFolds[currentFoldStep].active = true;
+            lastStepTime = 0;
+            console.log(`step ${currentFoldStep + 1}`);
+          } else {
+            console.log("boat folding complete");
+            isFolding = false;
+          }
+        }
       }
     }
 
@@ -261,7 +313,7 @@ async function main() {
 
     // camera + model
     const modelViewMatrix = glMatrix.mat4.create();
-    glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, 0.2, -1]);
+    glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.1, -1]);
     glMatrix.mat4.rotateY(modelViewMatrix, modelViewMatrix, time * 0.2);
     // glMatrix.mat4.rotateX(modelViewMatrix, modelViewMatrix, -0.9);
 
@@ -288,24 +340,33 @@ async function main() {
 
 
 
+    // Apply manual folds transformations
     for (const fold of manualFolds) {
+      if (!fold.active && fold.angle === 0) continue;
+
       for (let i = 0; i < transformedPositions.length; i += 3) {
-        const pos = glMatrix.vec3.fromValues(
+        // use original positions for condition checking
+        const originalPos = glMatrix.vec3.fromValues(
+          originalPositions[i],
+          originalPositions[i + 1],
+          originalPositions[i + 2]
+        );
+
+        const currentPos = glMatrix.vec3.fromValues(
           transformedPositions[i],
           transformedPositions[i + 1],
           transformedPositions[i + 2]
         );
 
-        if (fold.condition && !fold.condition(pos)) continue;
+        if (fold.condition && !fold.condition(originalPos)) continue;
 
-        const rotated = rotatePointAroundAxis(pos, fold.pivot, fold.axis, fold.angle);
+        const rotated = rotatePointAroundAxis(currentPos, fold.pivot, fold.axis, fold.angle);
 
         transformedPositions[i + 0] = rotated[0];
         transformedPositions[i + 1] = rotated[1];
         transformedPositions[i + 2] = rotated[2];
       }
     }
-
 
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
