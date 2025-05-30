@@ -13,7 +13,6 @@ let isFolding = false;
 function startFolding() {
   console.log("Starting folding animation");
   isFolding = true;
-  // Reset all fold angles to start the animation
   for (let fold of manualFolds) {
     fold.angle = 0;
   }
@@ -23,12 +22,12 @@ document.addEventListener('DOMContentLoaded', function () {
   const foldBtn = document.getElementById('foldBtn');
   if (foldBtn) {
     foldBtn.addEventListener('click', () => {
-      console.log('Fold button clicked!');
+      console.log('fold button clicked');
       startFolding();
     });
-    console.log("Button event listener added successfully");
+    console.log("button event listener added successfully");
   } else {
-    console.error("Could not find element with id 'foldBtn'");
+    console.error("could not find element with id 'foldBtn'");
   }
 });
 
@@ -110,16 +109,16 @@ let manualFolds = [
     axis: [1, 0, 0], // fold around X-axis
     pivot: [0, 0, 0], // fold around center
     angle: 0,
-    targetAngle: Math.PI / 2,
-    speed: 1.0,
+    targetAngle: Math.PI / 4,
+    speed: 2.0,
     condition: (pos) => pos[2] > 0  // only fold top half
   },
   {
     axis: [1, 0, 0],
     pivot: [0, 0, 0],
     angle: 0,
-    targetAngle: -Math.PI / 2,
-    speed: 1.0,
+    targetAngle: -Math.PI / 4,
+    speed: 2.0,
     condition: (pos) => pos[2] < 0  // only fold bottom half
   }
 ];
@@ -224,7 +223,7 @@ async function main() {
 
 
     if (isFolding) {
-      console.log("Folding in progress..."); // Debug log
+      console.log("folding...");
       let allDone = true;
 
       for (let fold of manualFolds) {
@@ -236,15 +235,15 @@ async function main() {
         if (Math.abs(fold.angle - fold.targetAngle) > 0.01) {
           allDone = false;
         } else {
-          fold.angle = fold.targetAngle; // Snap if close
+          fold.angle = fold.targetAngle; // snap if close
         }
 
         console.log(`Fold angle: ${fold.angle.toFixed(3)}, target: ${fold.targetAngle.toFixed(3)}`);
       }
 
       if (allDone) {
-        console.log("Folding animation complete!");
-        isFolding = false; // Stop updating once all folds are done
+        console.log("folding complete");
+        isFolding = false; // stop updating once all folds are done
       }
     }
 
@@ -258,12 +257,13 @@ async function main() {
     // perspective projection
     const aspect = canvas.width / canvas.height;
     const projectionMatrix = glMatrix.mat4.create();
-    glMatrix.mat4.perspective(projectionMatrix, Math.PI / 4, aspect, 0.1, 100.0);
+    glMatrix.mat4.perspective(projectionMatrix, Math.PI / 3, aspect, 0.1, 100.0);
 
     // camera + model
     const modelViewMatrix = glMatrix.mat4.create();
-    glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.2, -1.5]);
+    glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.1, -2.5]);
     glMatrix.mat4.rotateY(modelViewMatrix, modelViewMatrix, time * 0.2);
+    glMatrix.mat4.rotateX(modelViewMatrix, modelViewMatrix, -0.2);
 
     const viewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(viewMatrix, modelViewMatrix);
@@ -331,9 +331,10 @@ async function main() {
 
     // gl.uniform3fv(uniformLocations.baseColor, [r, g, b]);
 
-    gl.uniform3fv(uniformLocations.baseColor, [0, 40, 0]);
+    gl.uniform3fv(uniformLocations.baseColor, [40, 10, 0]);
 
     // gl.uniform3fv(uniformLocations.baseColor, [0.0, 0.4, 1.0]);
+
 
 
 
