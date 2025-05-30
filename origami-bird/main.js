@@ -113,46 +113,46 @@ function createPaperGeometry(subdivisions = 10) {
 }
 
 
-// paper boat folding 
+// paper plane folding 
 let manualFolds = [
-  // step 1: fold in half horizontally
+
   {
-    axis: [1, 0, 0],
-    pivot: [0, 0, 0],
+    axis: [0, 0, 1], // fold around Z-axis
+    pivot: [0, 0, 0], // center line
     angle: 0,
-    targetAngle: Math.PI,
-    speed: 1.5,
-    condition: (pos) => pos[2] > 0,
+    targetAngle: -Math.PI / 2.5, // -72 degrees (steeper)
+    speed: 1.0,
+    condition: (pos) => pos[0] < 0 && pos[1] > -0.1, // left side, upper part
     active: false
   },
-  // step 2: fold top-left corner (adjust condition)
+  // fold right wing down  
   {
-    axis: [0, 0, 1],
-    pivot: [-0.25, 0, 0.25],
+    axis: [0, 0, 1], // fold around Z-axis
+    pivot: [0, 0, 0], // center line
     angle: 0,
-    targetAngle: Math.PI / 3,
-    speed: 1.5,
-    condition: (pos) => pos[0] < -0.1 && pos[2] > 0.1, // ssimplified condition
+    targetAngle: Math.PI / 2.5, // 72 degrees (steeper)
+    speed: 1.0,
+    condition: (pos) => pos[0] > 0 && pos[1] > -0.1, // right side, upper part
     active: false
   },
-  // step 3: fold top-right corner (adjust condition)
+  // flatten wing left
   {
-    axis: [0, 0, 1],
-    pivot: [0.25, 0, 0.25],
+    axis: [0, 0, 1], // fold around Z-axis
+    pivot: [-0.25, 0, 0], // pivot point on left wing
     angle: 0,
-    targetAngle: -Math.PI / 3,
-    speed: 1.5,
-    condition: (pos) => pos[0] > 0.1 && pos[2] > 0.1, // simplified condition
+    targetAngle: Math.PI / 3, // positive angle to fold outwards
+    speed: 0.8,
+    condition: (pos) => pos[0] < -0.15 && pos[1] > -0.1, // left wing area
     active: false
   },
-  // step 4: fold bottom flap up
+  // flatten right wing 
   {
-    axis: [1, 0, 0],
-    pivot: [0, 0, -0.35],
+    axis: [0, 0, 1], // fold around Z-axis
+    pivot: [0.25, 0, 0], // pivot point on right wing
     angle: 0,
-    targetAngle: Math.PI / 2,
-    speed: 1.5,
-    condition: (pos) => pos[2] < -0.2 && Math.abs(pos[0]) < 0.4,
+    targetAngle: -Math.PI / 3, // negative angle to fold outwards (opposite direction)
+    speed: 0.8,
+    condition: (pos) => pos[0] > 0.15 && pos[1] > -0.1, // right wing area
     active: false
   }
 ];
@@ -384,7 +384,7 @@ async function main() {
     gl.uniformMatrix4fv(uniformLocations.modelView, false, modelViewMatrix);
     gl.uniformMatrix4fv(uniformLocations.normalMatrix, false, normalMatrix);
 
-    gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
+    // gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
 
     // const r = (Math.sin(time) + 1) / 2;  // oscillates 0 to 1
     // const g = 0.5;
@@ -395,6 +395,11 @@ async function main() {
     gl.uniform3fv(uniformLocations.baseColor, [40, 10, 0]);
 
     // gl.uniform3fv(uniformLocations.baseColor, [0.0, 0.4, 1.0]);
+
+    gl.uniform3fv(uniformLocations.lightPos, [2, 2, 2]);
+    gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
+    // gl.uniform3fv(uniformLocations.baseColor, [0.9, 0.9, 0.95]); // Paper white
+    gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
 
 
 
