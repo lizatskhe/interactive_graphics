@@ -8,6 +8,30 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 gl.viewport(0, 0, canvas.width, canvas.height);
 
+let isFolding = false;
+
+function startFolding() {
+  console.log("Starting folding animation");
+  isFolding = true;
+  // Reset all fold angles to start the animation
+  for (let fold of manualFolds) {
+    fold.angle = 0;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const foldBtn = document.getElementById('foldBtn');
+  if (foldBtn) {
+    foldBtn.addEventListener('click', () => {
+      console.log('Fold button clicked!');
+      startFolding();
+    });
+    console.log("Button event listener added successfully");
+  } else {
+    console.error("Could not find element with id 'foldBtn'");
+  }
+});
+
 
 // load shaders
 async function loadShaderSource(url) {
@@ -79,22 +103,27 @@ function createPaperGeometry(subdivisions = 10) {
   };
 }
 
+
+
 let manualFolds = [
   {
-    axis: [1, 0, 0],        // fold around X
-    pivot: [0, 0, 0],       // fold origin
-    angle: 0,               // current fold angle
-    targetAngle: Math.PI / 2, // 90° fold
-    speed: 1.0              // radians per second
+    axis: [1, 0, 0], // fold around X-axis
+    pivot: [0, 0, 0], // fold around center
+    angle: 0,
+    targetAngle: Math.PI / 2,
+    speed: 1.0,
+    condition: (pos) => pos[2] > 0  // only fold top half
   },
   {
-    axis: [0, 0, 1],        // fold around Z
-    pivot: [0.25, 0, 0],    // example origin
+    axis: [1, 0, 0],
+    pivot: [0, 0, 0],
     angle: 0,
     targetAngle: -Math.PI / 2,
-    speed: 1.0
+    speed: 1.0,
+    condition: (pos) => pos[2] < 0  // only fold bottom half
   }
 ];
+
 
 let currentFoldIndex = 0;
 
@@ -193,24 +222,37 @@ async function main() {
     const deltaTime = time - previousTime;
     previousTime = time;
 
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    console.log(`Fold ${currentFoldIndex} angle: ${folds[currentFoldIndex]?.angle.toFixed(3)}`);
 
-    if (currentFoldIndex < folds.length) {
-      const fold = folds[currentFoldIndex];
-      if (fold) {
+    if (isFolding) {
+      console.log("Folding in progress..."); // Debug log
+      let allDone = true;
+
+      for (let fold of manualFolds) {
         const deltaAngle = fold.speed * deltaTime;
         const remaining = fold.targetAngle - fold.angle;
         const step = Math.sign(remaining) * Math.min(Math.abs(remaining), deltaAngle);
-
         fold.angle += step;
 
-        if (Math.abs(fold.angle - fold.targetAngle) < 0.01) {
-          fold.angle = fold.targetAngle;
-          currentFoldIndex++;
+        if (Math.abs(fold.angle - fold.targetAngle) > 0.01) {
+          allDone = false;
+        } else {
+          fold.angle = fold.targetAngle; // Snap if close
         }
+
+        console.log(`Fold angle: ${fold.angle.toFixed(3)}, target: ${fold.targetAngle.toFixed(3)}`);
+      }
+
+      if (allDone) {
+        console.log("Folding animation complete!");
+        isFolding = false; // Stop updating once all folds are done
       }
     }
+
+
+
+
+
+    gl.viewport(0, 0, canvas.width, canvas.height);
 
 
     // perspective projection
@@ -222,7 +264,7 @@ async function main() {
     const modelViewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.2, -1.5]);
     glMatrix.mat4.rotateY(modelViewMatrix, modelViewMatrix, time * 0.2);
-    
+
     const viewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(viewMatrix, modelViewMatrix);
 
@@ -245,21 +287,25 @@ async function main() {
     const transformedPositions = new Float32Array(originalPositions); // fresh copy
 
 
-    for (const fold of folds) {
-      for (let idxCoord of fold.indices) {
+
+    for (const fold of manualFolds) {
+      for (let i = 0; i < transformedPositions.length; i += 3) {
         const pos = glMatrix.vec3.fromValues(
-          originalPositions[idxCoord + 0],
-          originalPositions[idxCoord + 1],
-          originalPositions[idxCoord + 2]
+          transformedPositions[i],
+          transformedPositions[i + 1],
+          transformedPositions[i + 2]
         );
+
+        if (fold.condition && !fold.condition(pos)) continue;
 
         const rotated = rotatePointAroundAxis(pos, fold.pivot, fold.axis, fold.angle);
 
-        transformedPositions[idxCoord + 0] = rotated[0];
-        transformedPositions[idxCoord + 1] = rotated[1];
-        transformedPositions[idxCoord + 2] = rotated[2];
+        transformedPositions[i + 0] = rotated[0];
+        transformedPositions[i + 1] = rotated[1];
+        transformedPositions[i + 2] = rotated[2];
       }
     }
+
 
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -285,7 +331,10 @@ async function main() {
 
     // gl.uniform3fv(uniformLocations.baseColor, [r, g, b]);
 
-    gl.uniform3fv(uniformLocations.baseColor, [0, 51, 0]);
+    gl.uniform3fv(uniformLocations.baseColor, [0, 40, 0]);
+
+    // gl.uniform3fv(uniformLocations.baseColor, [0.0, 0.4, 1.0]);
+
 
 
     // draw
@@ -298,3 +347,4 @@ async function main() {
 }
 
 main();
+
