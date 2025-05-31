@@ -11,7 +11,7 @@ gl.viewport(0, 0, canvas.width, canvas.height);
 let isFolding = false;
 
 function startFolding() {
-  console.log("starting boat folding");
+  console.log("starting bird folding");
   isFolding = true;
   currentFoldStep = 0;
   lastStepTime = 0;
@@ -21,10 +21,9 @@ function startFolding() {
     fold.active = false;
   }
 
-  // activate first fold
   if (manualFolds.length > 0) {
     manualFolds[0].active = true;
-    console.log("step 1: folding paper in half");
+    console.log("Step 1: Folding left wing down");
   }
 }
 
@@ -83,28 +82,33 @@ console.log("shader program initialized");
 
 
 // create a square
-function createPaperGeometry(subdivisions = 10) {
+function createPaperGeometry(subdivisions = 10, scale = 0.3) { // with a scale parameter
   const positions = [];
   const normals = [];
 
   for (let i = 0; i < subdivisions; i++) {
     for (let j = 0; j < subdivisions; j++) {
-      const x0 = i / subdivisions - 0.5;
-      const x1 = (i + 1) / subdivisions - 0.5;
-      const y0 = j / subdivisions - 0.5;
-      const y1 = (j + 1) / subdivisions - 0.5;
+      // scale down the coordinates
+      const x0 = (i / subdivisions - 0.5) * scale;
+      const x1 = ((i + 1) / subdivisions - 0.5) * scale;
+      const y0 = 0; // keep Y at 0 (flat)
+      const y1 = 0;
+      const z0 = (j / subdivisions - 0.5) * scale;
+      const z1 = ((j + 1) / subdivisions - 0.5) * scale;
 
       // two triangles per quad
-      positions.push(x0, 0, y0, x1, 0, y0, x1, 0, y1);
-      positions.push(x0, 0, y0, x1, 0, y1, x0, 0, y1);
+      positions.push(x0, y0, z0, x1, y1, z0, x1, y1, z1);
+      positions.push(x0, y0, z0, x1, y1, z1, x0, y0, z1);
 
+      // normals pointing up
       for (let k = 0; k < 6; k++) {
         normals.push(0, 1, 0);
       }
     }
   }
+  
   console.log("geometry created: ", positions.length / 3, " vertices");
-
+  console.log("paper size: ", scale, "x", scale, "units");
 
   return {
     positions: new Float32Array(positions),
@@ -160,46 +164,104 @@ function createShadowVertices(originalPositions, transformedPositions, lightPos)
 }
 
 
-// paper plane folding 
+// paper bird folding 
 let manualFolds = [
-
+// step 1: fold left wing down
   {
-    axis: [0, 0, 1], // fold around Z-axis
+    axis: [0, 0, 1],
     pivot: [0, 0, 0], // center line
     angle: 0,
-    targetAngle: -Math.PI / 2.5, // -72 degrees (steeper)
+    targetAngle: -Math.PI / 2.5,
     speed: 1.0,
-    condition: (pos) => pos[0] < 0 && pos[1] > -0.1, // left side, upper part
+    condition: (pos) => pos[0] < 0 && pos[1] > -0.03, // scaled down threshold
     active: false
   },
-  // fold right wing down  
+  
+  // step 2: fold right wing down  
   {
-    axis: [0, 0, 1], // fold around Z-axis
-    pivot: [0, 0, 0], // center line
+    axis: [0, 0, 1],
+    pivot: [0, 0, 0],
     angle: 0,
-    targetAngle: Math.PI / 2.5, // 72 degrees (steeper)
+    targetAngle: Math.PI / 2.5,
     speed: 1.0,
-    condition: (pos) => pos[0] > 0 && pos[1] > -0.1, // right side, upper part
+    condition: (pos) => pos[0] > 0 && pos[1] > -0.03, // scaled down threshold
     active: false
   },
-  // flatten wing left
+  
+  // step 3: create the head/beak
   {
-    axis: [0, 0, 1], // fold around Z-axis
-    pivot: [-0.25, 0, 0], // pivot point on left wing
+    axis: [1, 0, 0],
+    pivot: [0, 0, 0.12], // scaled front position (0.4 * 0.3)
     angle: 0,
-    targetAngle: Math.PI / 3, // positive angle to fold outwards
+    targetAngle: -Math.PI / 6,
     speed: 0.8,
-    condition: (pos) => pos[0] < -0.15 && pos[1] > -0.1, // left wing area
+    condition: (pos) => pos[2] > 0.09, // scaled front section (0.3 * 0.3)
     active: false
   },
-  // flatten right wing 
+  
+  // step 4: create the tail
   {
-    axis: [0, 0, 1], // fold around Z-axis
-    pivot: [0.25, 0, 0], // pivot point on right wing
+    axis: [1, 0, 0],
+    pivot: [0, 0, -0.12], // scaled back position
     angle: 0,
-    targetAngle: -Math.PI / 3, // negative angle to fold outwards (opposite direction)
+    targetAngle: Math.PI / 4,
     speed: 0.8,
-    condition: (pos) => pos[0] > 0.15 && pos[1] > -0.1, // right wing area
+    condition: (pos) => pos[2] < -0.09, // scaled back section
+    active: false
+  },
+  
+  // step 5: flatten left wing outward
+  {
+    axis: [0, 0, 1],
+    pivot: [-0.075, 0, 0], // scaled pivot (-0.25 * 0.3)
+    angle: 0,
+    targetAngle: Math.PI / 4,
+    speed: 0.8,
+    condition: (pos) => pos[0] < -0.045 && pos[1] > -0.03, // scaled wing area
+    active: false
+  },
+  
+  // step 6: flatten right wing outward
+  {
+    axis: [0, 0, 1],
+    pivot: [0.075, 0, 0], // scaled pivot
+    angle: 0,
+    targetAngle: -Math.PI / 4,
+    speed: 0.8,
+    condition: (pos) => pos[0] > 0.045 && pos[1] > -0.03, // scaled wing area
+    active: false
+  },
+  
+  // step 7: left wing tip fold
+  {
+    axis: [0, 1, 0],
+    pivot: [-0.12, 0, 0], // scaled wing tip (-0.4 * 0.3)
+    angle: 0,
+    targetAngle: Math.PI / 8,
+    speed: 0.6,
+    condition: (pos) => pos[0] < -0.105 && Math.abs(pos[2]) < 0.06, // scaled conditions
+    active: false
+  },
+  
+  // step 8: right wing tip fold
+  {
+    axis: [0, 1, 0],
+    pivot: [0.12, 0, 0], // scaled wing tip
+    angle: 0,
+    targetAngle: -Math.PI / 8,
+    speed: 0.6,
+    condition: (pos) => pos[0] > 0.105 && Math.abs(pos[2]) < 0.06, // scaled conditions
+    active: false
+  },
+  
+  // step 9: body center crease
+  {
+    axis: [0, 0, 1],
+    pivot: [0, 0, 0],
+    angle: 0,
+    targetAngle: Math.PI / 12,
+    speed: 0.5,
+    condition: (pos) => Math.abs(pos[0]) < 0.03 && Math.abs(pos[2]) < 0.06, // scaled center body
     active: false
   }
 ];
@@ -280,7 +342,7 @@ async function main() {
 
   gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
 
-  const { positions, normals } = createPaperGeometry(20);
+  const { positions, normals } = createPaperGeometry(20, 0.5);
   const originalPositions = new Float32Array(positions); // copy for reference
   const folds = createFolds(originalPositions, 20);
 
@@ -369,7 +431,7 @@ async function main() {
 
     // camera + model
     const modelViewMatrix = glMatrix.mat4.create();
-    glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.1, -1]);
+    glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.1, -0.8]);
     glMatrix.mat4.rotateY(modelViewMatrix, modelViewMatrix, time * 0.2);
 
     const viewMatrix = glMatrix.mat4.create();
