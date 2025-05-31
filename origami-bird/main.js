@@ -106,7 +106,7 @@ function createPaperGeometry(subdivisions = 10, scale = 0.3) { // with a scale p
       }
     }
   }
-  
+
   console.log("geometry created: ", positions.length / 3, " vertices");
   console.log("paper size: ", scale, "x", scale, "units");
 
@@ -166,104 +166,50 @@ function createShadowVertices(originalPositions, transformedPositions, lightPos)
 
 // paper bird folding 
 let manualFolds = [
-// step 1: fold left wing down
+  // step 3: fold top-left petal upward
   {
-    axis: [0, 0, 1],
-    pivot: [0, 0, 0], // center line
+    axis: [-0.707, 0, -0.707], // diagonal axis (corrected direction)
+    pivot: [-0.05, 0, 0.05], // top-left quadrant pivot
     angle: 0,
-    targetAngle: -Math.PI / 2.5,
+    targetAngle: Math.PI / 2, // 60 degree fold
     speed: 1.0,
-    condition: (pos) => pos[0] < 0 && pos[1] > -0.03, // scaled down threshold
+    condition: (pos) => pos[0] < -0.08 && pos[2] > 0.08, // top-left quadrant
     active: false
   },
-  
-  // step 2: fold right wing down  
+
+  // // step 4: fold top-right petal upward 
   {
-    axis: [0, 0, 1],
-    pivot: [0, 0, 0],
+    axis: [-0.707, 0, 0.707], // diagonal axis (opposite direction)
+    pivot: [0.05, 0, 0.05], // top-right quadrant pivot
     angle: 0,
-    targetAngle: Math.PI / 2.5,
+    targetAngle: Math.PI / 2, // 60 degree fold
     speed: 1.0,
-    condition: (pos) => pos[0] > 0 && pos[1] > -0.03, // scaled down threshold
+    condition: (pos) => pos[0] > 0.08 && pos[2] > 0.08, // top-right quadrant
     active: false
   },
-  
-  // step 3: create the head/beak
+
+  // // step 5: fold bottom-left petal upward
   {
-    axis: [1, 0, 0],
-    pivot: [0, 0, 0.12], // scaled front position (0.4 * 0.3)
+    axis: [0.707, 0, -0.707], // diagonal axis
+    pivot: [-0.05, 0, -0.05], // bottom-left quadrant pivot
     angle: 0,
-    targetAngle: -Math.PI / 6,
-    speed: 0.8,
-    condition: (pos) => pos[2] > 0.09, // scaled front section (0.3 * 0.3)
+    targetAngle: Math.PI / 2, // 60 degree fold
+    speed: 1.0,
+    condition: (pos) => pos[0] < -0.08 && pos[2] < -0.08, // bottom-left quadrant
     active: false
   },
-  
-  // step 4: create the tail
+
+  // step 6: fold bottom-right petal upward
   {
-    axis: [1, 0, 0],
-    pivot: [0, 0, -0.12], // scaled back position
+    axis: [0.707, 0, 0.707], // diagonal axis (corrected direction)
+    pivot: [0.05, 0, -0.05], // bottom-right quadrant pivot
     angle: 0,
-    targetAngle: Math.PI / 4,
-    speed: 0.8,
-    condition: (pos) => pos[2] < -0.09, // scaled back section
+    targetAngle: Math.PI / 2, // 60 degree fold
+    speed: 1.0,
+    condition: (pos) => pos[0] > 0.08 && pos[2] < -0.08, // bottom-right quadrant
     active: false
   },
-  
-  // step 5: flatten left wing outward
-  {
-    axis: [0, 0, 1],
-    pivot: [-0.075, 0, 0], // scaled pivot (-0.25 * 0.3)
-    angle: 0,
-    targetAngle: Math.PI / 4,
-    speed: 0.8,
-    condition: (pos) => pos[0] < -0.045 && pos[1] > -0.03, // scaled wing area
-    active: false
-  },
-  
-  // step 6: flatten right wing outward
-  {
-    axis: [0, 0, 1],
-    pivot: [0.075, 0, 0], // scaled pivot
-    angle: 0,
-    targetAngle: -Math.PI / 4,
-    speed: 0.8,
-    condition: (pos) => pos[0] > 0.045 && pos[1] > -0.03, // scaled wing area
-    active: false
-  },
-  
-  // step 7: left wing tip fold
-  {
-    axis: [0, 1, 0],
-    pivot: [-0.12, 0, 0], // scaled wing tip (-0.4 * 0.3)
-    angle: 0,
-    targetAngle: Math.PI / 8,
-    speed: 0.6,
-    condition: (pos) => pos[0] < -0.105 && Math.abs(pos[2]) < 0.06, // scaled conditions
-    active: false
-  },
-  
-  // step 8: right wing tip fold
-  {
-    axis: [0, 1, 0],
-    pivot: [0.12, 0, 0], // scaled wing tip
-    angle: 0,
-    targetAngle: -Math.PI / 8,
-    speed: 0.6,
-    condition: (pos) => pos[0] > 0.105 && Math.abs(pos[2]) < 0.06, // scaled conditions
-    active: false
-  },
-  
-  // step 9: body center crease
-  {
-    axis: [0, 0, 1],
-    pivot: [0, 0, 0],
-    angle: 0,
-    targetAngle: Math.PI / 12,
-    speed: 0.5,
-    condition: (pos) => Math.abs(pos[0]) < 0.03 && Math.abs(pos[2]) < 0.06, // scaled center body
-    active: false
-  }
+
 ];
 
 let currentFoldStep = 0;
