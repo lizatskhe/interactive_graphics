@@ -166,6 +166,7 @@ function createShadowVertices(originalPositions, transformedPositions, lightPos)
 
 // paper bird folding 
 let manualFolds = [
+  // OUTER PETALS (4 petals from corners)
   // step 3: fold top-left petal upward
   {
     axis: [-0.707, 0, -0.707], // diagonal axis (corrected direction)
@@ -188,7 +189,7 @@ let manualFolds = [
     active: false
   },
 
-  // // step 5: fold bottom-left petal upward
+  // step 5: fold bottom-left petal upward
   {
     axis: [0.707, 0, -0.707], // diagonal axis
     pivot: [-0.05, 0, -0.05], // bottom-left quadrant pivot
@@ -209,6 +210,50 @@ let manualFolds = [
     condition: (pos) => pos[0] > 0.08 && pos[2] < -0.08, // bottom-right quadrant
     active: false
   },
+  // INNER PETALS (4 additional petals from flat areas)
+  // step 5: fold left inner petal (between top-left and bottom-left)
+  {
+    axis: [0, 0, -1], // fold along Z axis
+    pivot: [-0.12, 0, 0], // left edge
+    angle: 0,
+    targetAngle: Math.PI / 3, // 60 degrees for inner petals
+    speed: 1.2,
+    condition: (pos) => pos[0] < -0.05 && Math.abs(pos[2]) < 0.05,
+    active: false
+  },
+
+  // step 6: fold right inner petal 
+  {
+    axis: [0, 0, 1], // fold along Z axis (opposite direction)
+    pivot: [0.12, 0, 0], // right edge
+    angle: 0,
+    targetAngle: Math.PI / 3,
+    speed: 1.2,
+    condition: (pos) => pos[0] > 0.05 && Math.abs(pos[2]) < 0.05,
+    active: false
+  },
+
+  // step 7: fold top inner petal
+  {
+    axis: [-1, 0, 0], // fold along X axis
+    pivot: [0, 0, 0.12], // top edge
+    angle: 0,
+    targetAngle: Math.PI / 3,
+    speed: 1.2,
+    condition: (pos) => pos[2] > 0.05 && Math.abs(pos[0]) < 0.05,
+    active: false
+  },
+
+  // step 8: fold bottom inner petal
+  {
+    axis: [1, 0, 0], // fold along X axis (opposite direction)
+    pivot: [0, 0, -0.12], // bottom edge
+    angle: 0,
+    targetAngle: Math.PI / 3,
+    speed: 1.2,
+    condition: (pos) => pos[2] < -0.05 && Math.abs(pos[0]) < 0.05,
+    active: false
+  }
 
 ];
 
@@ -479,7 +524,9 @@ async function main() {
 
     // render the paper object
     gl.uniform1i(uniformLocations.isShadow, 0);
-    gl.uniform3fv(uniformLocations.baseColor, [0.9, 0.85, 0.8]);
+    // gl.uniform3fv(uniformLocations.baseColor, [0.9, 0.85, 0.8]);
+    gl.uniform3fv(uniformLocations.baseColor, [1, 0, 1]);
+
 
 
 
