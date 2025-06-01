@@ -11,7 +11,7 @@ gl.viewport(0, 0, canvas.width, canvas.height);
 let isFolding = false;
 
 function startFolding() {
-  console.log("starting bird folding");
+  console.log("starting flower folding");
   isFolding = true;
   currentFoldStep = 0;
   lastStepTime = 0;
@@ -23,7 +23,7 @@ function startFolding() {
 
   if (manualFolds.length > 0) {
     manualFolds[0].active = true;
-    console.log("Step 1: Folding left wing down");
+    console.log("step 1");
   }
 }
 
@@ -164,10 +164,10 @@ function createShadowVertices(originalPositions, transformedPositions, lightPos)
 }
 
 
-// paper bird folding 
+// paper flower folding 
 let manualFolds = [
   // OUTER PETALS (4 petals from corners)
-  // step 3: fold top-left petal upward
+  // step 1: fold top-left petal upward
   {
     axis: [-0.707, 0, -0.707], // diagonal axis (corrected direction)
     pivot: [-0.05, 0, 0.05], // top-left quadrant pivot
@@ -178,7 +178,7 @@ let manualFolds = [
     active: false
   },
 
-  // // step 4: fold top-right petal upward 
+  // // step 2: fold top-right petal upward 
   {
     axis: [-0.707, 0, 0.707], // diagonal axis (opposite direction)
     pivot: [0.05, 0, 0.05], // top-right quadrant pivot
@@ -189,7 +189,7 @@ let manualFolds = [
     active: false
   },
 
-  // step 5: fold bottom-left petal upward
+  // step 3: fold bottom-left petal upward
   {
     axis: [0.707, 0, -0.707], // diagonal axis
     pivot: [-0.05, 0, -0.05], // bottom-left quadrant pivot
@@ -200,7 +200,7 @@ let manualFolds = [
     active: false
   },
 
-  // step 6: fold bottom-right petal upward
+  // step 4: fold bottom-right petal upward
   {
     axis: [0.707, 0, 0.707], // diagonal axis (corrected direction)
     pivot: [0.05, 0, -0.05], // bottom-right quadrant pivot
@@ -322,14 +322,73 @@ async function main() {
     projection: gl.getUniformLocation(shaderProgram, "uProjectionMatrix"),
     modelView: gl.getUniformLocation(shaderProgram, "uModelViewMatrix"),
     normalMatrix: gl.getUniformLocation(shaderProgram, "uNormalMatrix"),
+
     lightPos: gl.getUniformLocation(shaderProgram, "uLightPosition"),
     lightColor: gl.getUniformLocation(shaderProgram, "uLightColor"),
+    lightIntensities: gl.getUniformLocation(shaderProgram, "uLightIntensities"),
+
     baseColor: gl.getUniformLocation(shaderProgram, "uBaseColor"),
-    foldAxis: gl.getUniformLocation(shaderProgram, "uFoldAxis"),
-    foldOrigin: gl.getUniformLocation(shaderProgram, "uFoldOrigin"),
-    foldAngle: gl.getUniformLocation(shaderProgram, "uFoldAngle"),
+    shininess: gl.getUniformLocation(shaderProgram, "uShininess"),
+    specularStrength: gl.getUniformLocation(shaderProgram, "uSpecularStrength"),
+
     viewPos: gl.getUniformLocation(shaderProgram, "uViewPos"),
+    time: gl.getUniformLocation(shaderProgram, "uTime"),
+    bloomThreshold: gl.getUniformLocation(shaderProgram, "uBloomThreshold"),
+    bloomIntensity: gl.getUniformLocation(shaderProgram, "uBloomIntensity"),
+    isShadow: gl.getUniformLocation(shaderProgram, "uIsShadow"),
   };
+
+  function setupEnhancedLighting(time) {
+    // three dynamic light sources
+    const lightPositions = [
+      // main rotating light (warm)
+      2.5 * Math.cos(time * 0.5),
+      2.0 + Math.sin(time * 0.3),
+      2.5 * Math.sin(time * 0.5),
+
+      // secondary light (cool, counter-rotating)
+      -1.5 * Math.cos(time * 0.3 + Math.PI),
+      1.5,
+      -1.5 * Math.sin(time * 0.3 + Math.PI),
+
+      // accent light (subtle, high up)
+      0.5 * Math.sin(time * 0.7),
+      3.0,
+      0.5 * Math.cos(time * 0.7)
+    ];
+
+    const lightColors = [
+      // warm main light
+      1.0, 0.9, 0.7,
+
+      // cool secondary light
+      0.7, 0.8, 1.0,
+
+      // soft accent light
+      0.9, 0.95, 1.0
+    ];
+
+    const lightIntensities = [
+      1.2,  // main light
+      0.8,  // secondary light
+      0.4   // accent light
+    ];
+
+    gl.uniform3fv(uniformLocations.lightPositions, lightPositions);
+    gl.uniform3fv(uniformLocations.lightColors, lightColors);
+    gl.uniform1fv(uniformLocations.lightIntensities, lightIntensities);
+
+    // paper-like appearance
+    gl.uniform1f(uniformLocations.shininess, 32.0);
+    gl.uniform1f(uniformLocations.specularStrength, 0.3);
+
+    // bloom effect settings
+    gl.uniform1f(uniformLocations.bloomThreshold, 0.8);
+    gl.uniform1f(uniformLocations.bloomIntensity, 1.5);
+
+    // time for animated effects
+    gl.uniform1f(uniformLocations.time, time);
+  }
 
   gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
 
@@ -340,8 +399,8 @@ async function main() {
   const shadowPlane = createShadowPlane();
 
 
-  console.log("Folds created:", folds.length);
-  console.log("First fold:", folds[0]);
+  console.log("folds created:", folds.length);
+  console.log("first fold:", folds[0]);
 
 
   const positionBuffer = gl.createBuffer();
@@ -360,7 +419,7 @@ async function main() {
   gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlaneNormalBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, shadowPlane.normals, gl.STATIC_DRAW);
 
-  // Shadow object buffers
+  // shadow object buffers
   const shadowPositionBuffer = gl.createBuffer();
 
   gl.enable(gl.DEPTH_TEST);
@@ -414,6 +473,7 @@ async function main() {
       }
     }
 
+    setupEnhancedLighting(time);
 
     // perspective projection
     const aspect = canvas.width / canvas.height;
@@ -437,7 +497,14 @@ async function main() {
     const lightViewPos = glMatrix.vec3.create();
     glMatrix.vec3.transformMat4(lightViewPos, lightWorldPos, viewMatrix);
 
-    const cameraWorldPos = glMatrix.vec3.fromValues(0, 0, 0);
+    // const cameraWorldPos = glMatrix.vec3.fromValues(0, 0, 0);
+    // view position for specular calculations
+    const cameraWorldPos = [
+      Math.sin(time * 0.2) * 0.1,  // subtle camera movement
+      0.1,
+      0.8
+    ];
+    gl.uniform3fv(uniformLocations.viewPos, cameraWorldPos);
     const cameraViewPos = glMatrix.vec3.create();
     glMatrix.vec3.transformMat4(cameraViewPos, cameraWorldPos, viewMatrix);
 
@@ -453,7 +520,9 @@ async function main() {
 
 
 
-    // Apply manual folds transformations
+
+
+    // apply manual folds transformations
     for (const fold of manualFolds) {
       if (!fold.active && fold.angle === 0) continue;
 
@@ -524,8 +593,17 @@ async function main() {
 
     // render the paper object
     gl.uniform1i(uniformLocations.isShadow, 0);
+
     // gl.uniform3fv(uniformLocations.baseColor, [0.9, 0.85, 0.8]);
-    gl.uniform3fv(uniformLocations.baseColor, [1, 0, 1]);
+    // gl.uniform3fv(uniformLocations.baseColor, [1, 0, 1]);
+    // dynamic base color 
+    const hue = time * 0.1;
+    const baseColor = [
+      0.9 + 0.1 * Math.sin(hue),
+      0.4 + 0.2 * Math.sin(hue + Math.PI / 3),
+      0.8 + 0.1 * Math.sin(hue + 2 * Math.PI / 3)
+    ];
+    gl.uniform3fv(uniformLocations.baseColor, baseColor);
 
 
 
