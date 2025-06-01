@@ -40,7 +40,10 @@ void main() {
     if (uIsShadow == 1) {
         //gl_FragColor = vec4(0.1, 0.1, 0.1, 0.5);
         // gl_FragColor = vec4(0.5, 0.55, 0.5, 0.3); // slight green tinted shadow
-        gl_FragColor = vec4(0.3, 0.35, 0.3, 0.4); // darker green tinted shadow        
+        // gl_FragColor = vec4(0.3, 0.35, 0.3, 0.4); // darker green tinted shadow        
+        // gl_FragColor = vec4(0.2, 0.25, 0.2, 0.5); // darker green shadow grey-blueish
+        gl_FragColor = vec4(0.07, 0.15, 0.07, 0.7); // dark green shadow
+        // gl_FragColor = vec4(0.1, 0.35, 0.1, 0.5); // darker, more green shadow
         return;
     }
     
