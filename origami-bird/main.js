@@ -336,6 +336,7 @@ async function main() {
     bloomThreshold: gl.getUniformLocation(shaderProgram, "uBloomThreshold"),
     bloomIntensity: gl.getUniformLocation(shaderProgram, "uBloomIntensity"),
     isShadow: gl.getUniformLocation(shaderProgram, "uIsShadow"),
+    isFlower: gl.getUniformLocation(shaderProgram, "uIsFlower"),
   };
 
   function setupEnhancedLighting(time) {
@@ -558,6 +559,7 @@ async function main() {
 
     // render shadow plane 
     gl.uniform1i(uniformLocations.isShadow, 0);
+    gl.uniform1i(uniformLocations.isFlower, 0); 
     gl.uniform3fv(uniformLocations.baseColor, [5, 6, 4.5]); // light green color
 
     gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlanePositionBuffer);
@@ -573,6 +575,7 @@ async function main() {
 
     // render paper shadow
     gl.uniform1i(uniformLocations.isShadow, 1);
+    gl.uniform1i(uniformLocations.isFlower, 0);
 
 
     const shadowPositions = createShadowVertices(originalPositions, transformedPositions, lightWorldPos);
@@ -592,6 +595,7 @@ async function main() {
 
     // render the paper object
     gl.uniform1i(uniformLocations.isShadow, 0);
+    gl.uniform1i(uniformLocations.isFlower, 1); 
 
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
