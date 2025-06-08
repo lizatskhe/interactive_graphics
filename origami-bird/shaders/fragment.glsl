@@ -7,7 +7,6 @@ uniform vec3 uLightPositions[3];
 uniform vec3 uLightColors[3];
 uniform float uLightIntensities[3];
 
-
 uniform vec3 uBaseColor;
 uniform float uShininess;
 uniform float uSpecularStrength;
@@ -36,22 +35,37 @@ vec3 calculatePointLight(vec3 lightPos, vec3 lightColor, float intensity, vec3 n
     return (diffuse + specular) * attenuation;
 }
 
+vec3 createGradientColor(vec3 baseColor, vec3 position) {
+    float gradientFactor = smoothstep(-0.2, 0.3, position.y);
+    
+    vec3 bottomColor = vec3(0, 3, 1);  // Green
+    vec3 topColor = vec3(15, 0, 10);    // beautiful pink-purple
+
+    vec3 gradientColor = mix(bottomColor, topColor, gradientFactor);
+    
+    float hue = uTime * 0.1;
+    vec3 colorVariation = vec3(
+        0.1 * sin(hue),
+        0.1 * sin(hue + 1.57), // PI/2
+        0.1 * sin(hue + 3.14)  // PI
+    );
+    
+    return gradientColor + colorVariation;
+}
+
 void main() {
     if (uIsShadow == 1) {
-        //gl_FragColor = vec4(0.1, 0.1, 0.1, 0.5);
-        // gl_FragColor = vec4(0.5, 0.55, 0.5, 0.3); // slight green tinted shadow
-        // gl_FragColor = vec4(0.3, 0.35, 0.3, 0.4); // darker green tinted shadow        
-        // gl_FragColor = vec4(0.2, 0.25, 0.2, 0.5); // darker green shadow grey-blueish
         gl_FragColor = vec4(0.07, 0.15, 0.07, 0.7); // dark green shadow
-        // gl_FragColor = vec4(0.1, 0.35, 0.1, 0.5); // darker, more green shadow
         return;
     }
     
     vec3 normal = normalize(vNormal);
     vec3 viewDir = normalize(uViewPos - vPosition);
     
+    vec3 gradientBaseColor = createGradientColor(uBaseColor, vPosition);
+    
     // ambient lighting
-    vec3 ambient = 0.1 * uBaseColor;
+    vec3 ambient = 0.1 * gradientBaseColor;
     
     // lighting from multiple sources
     vec3 lighting = ambient;
@@ -64,27 +78,33 @@ void main() {
             normal, 
             vPosition, 
             viewDir
-        ) * uBaseColor;
+        ) * gradientBaseColor;  // Use gradient color here too
     }
     
-    // subtle paper-like effects
+    // paper-like effects
     float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 2.0);
     vec3 fresnelColor = vec3(0.9, 0.95, 1.0) * fresnel * 0.3;
     lighting += fresnelColor;
     
-    // subtle golden sparkle for magical tulip effect
     float sparkle = sin(uTime * 3.0 + vPosition.x * 10.0 + vPosition.z * 10.0) * 0.02 + 0.02;
-    lighting += vec3(1.0, 0.85, 0.7) * sparkle;
+    vec3 sparkleColor = mix(vec3(0.7, 1.0, 0.8), vec3(1.0, 0.85, 0.7), smoothstep(-0.3, 0.4, vPosition.y));
+    lighting += sparkleColor * sparkle;
     
     // brightness for bloom
     float brightness = dot(lighting, vec3(0.299, 0.587, 0.114));
     
     vec3 finalColor = lighting;
     
-    // bloom effect for bright areas with pink/purple tint
+    // bloom effect that adapts to gradient
     if (brightness > uBloomThreshold) {
         float bloomFactor = (brightness - uBloomThreshold) * uBloomIntensity;
-        finalColor += vec3(bloomFactor * 0.4, bloomFactor * 0.2, bloomFactor * 0.4); // Pink-purple bloom
+        // bloom color that transitions from green-tinted at bottom to pink-purple at top
+        vec3 bloomTint = mix(
+            vec3(0.2, 0.4, 0.2),  // Green bloom for bottom
+            vec3(0.4, 0.2, 0.4),  // Pink-purple bloom for top
+            smoothstep(-0.3, 0.4, vPosition.y)
+        );
+        finalColor += bloomTint * bloomFactor;
     }
     
     gl_FragColor = vec4(finalColor, 1.0);
