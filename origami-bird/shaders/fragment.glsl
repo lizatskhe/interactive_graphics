@@ -13,6 +13,7 @@ uniform float uSpecularStrength;
 uniform vec3 uViewPos;
 
 uniform int uIsShadow;
+uniform int uIsFlower;
 uniform float uTime;
 
 uniform float uBloomThreshold;
@@ -38,10 +39,10 @@ vec3 calculatePointLight(vec3 lightPos, vec3 lightColor, float intensity, vec3 n
 vec3 createGradientColor(vec3 baseColor, vec3 position) {
     float gradientFactor = smoothstep(-0.2, 0.3, position.y);
     
-    vec3 bottomColor = vec3(0, 3, 1);  // Green
+    vec3 bottomColor = vec3(0, 3, 1);  // green
     vec3 topColor = vec3(15, 0, 10);    // beautiful pink-purple
 
-    vec3 gradientColor = mix(bottomColor, topColor, gradientFactor);
+        vec3 gradientColor = mix(bottomColor, topColor, gradientFactor);
     
     float hue = uTime * 0.1;
     vec3 colorVariation = vec3(
@@ -62,10 +63,11 @@ void main() {
     vec3 normal = normalize(vNormal);
     vec3 viewDir = normalize(uViewPos - vPosition);
     
-    vec3 gradientBaseColor = createGradientColor(uBaseColor, vPosition);
+    // gradient base color for flower, use uniform base color for ground
+    vec3 baseColor = (uIsFlower == 1) ? createGradientColor(uBaseColor, vPosition) : uBaseColor;
     
     // ambient lighting
-    vec3 ambient = 0.1 * gradientBaseColor;
+    vec3 ambient = 0.1 * baseColor;
     
     // lighting from multiple sources
     vec3 lighting = ambient;
@@ -78,33 +80,41 @@ void main() {
             normal, 
             vPosition, 
             viewDir
-        ) * gradientBaseColor;  // Use gradient color here too
+        ) * baseColor;  // Use baseColor (gradient for flower, uniform for ground)
     }
     
-    // paper-like effects
+    // subtle paper-like effects
     float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 2.0);
     vec3 fresnelColor = vec3(0.9, 0.95, 1.0) * fresnel * 0.3;
     lighting += fresnelColor;
     
     float sparkle = sin(uTime * 3.0 + vPosition.x * 10.0 + vPosition.z * 10.0) * 0.02 + 0.02;
-    vec3 sparkleColor = mix(vec3(0.7, 1.0, 0.8), vec3(1.0, 0.85, 0.7), smoothstep(-0.3, 0.4, vPosition.y));
-    lighting += sparkleColor * sparkle;
+    if (uIsFlower == 1) {
+        vec3 sparkleColor = mix(vec3(0.7, 1.0, 0.8), vec3(1.0, 0.85, 0.7), smoothstep(-0.3, 0.4, vPosition.y));
+        lighting += sparkleColor * sparkle;
+    } else {
+        lighting += vec3(1.0, 0.85, 0.7) * sparkle * 0.5;
+    }
     
     // brightness for bloom
     float brightness = dot(lighting, vec3(0.299, 0.587, 0.114));
     
     vec3 finalColor = lighting;
     
-    // bloom effect that adapts to gradient
+    // bloom effect that adapts to gradient (only for flower)
     if (brightness > uBloomThreshold) {
         float bloomFactor = (brightness - uBloomThreshold) * uBloomIntensity;
-        // bloom color that transitions from green-tinted at bottom to pink-purple at top
-        vec3 bloomTint = mix(
-            vec3(0.2, 0.4, 0.2),  // Green bloom for bottom
-            vec3(0.4, 0.2, 0.4),  // Pink-purple bloom for top
-            smoothstep(-0.3, 0.4, vPosition.y)
-        );
-        finalColor += bloomTint * bloomFactor;
+        if (uIsFlower == 1) {
+            // bloom color transitions from green-tinted at bottom to pink-purple at top
+            vec3 bloomTint = mix(
+                vec3(0.2, 0.4, 0.2),  // Green bloom for bottom
+                vec3(0.4, 0.2, 0.4),  // Pink-purple bloom for top
+                smoothstep(-0.3, 0.4, vPosition.y)
+            );
+            finalColor += bloomTint * bloomFactor;
+        } else {
+            finalColor += vec3(0.3, 0.3, 0.2) * bloomFactor;
+        }
     }
     
     gl_FragColor = vec4(finalColor, 1.0);
