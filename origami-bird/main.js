@@ -499,7 +499,6 @@ async function main() {
     const lightViewPos = glMatrix.vec3.create();
     glMatrix.vec3.transformMat4(lightViewPos, lightWorldPos, viewMatrix);
 
-    // const cameraWorldPos = glMatrix.vec3.fromValues(0, 0, 0);
     // view position for specular calculations
     const cameraWorldPos = [
       Math.sin(time * 0.2) * 0.1,  // subtle camera movement
@@ -519,10 +518,6 @@ async function main() {
     glMatrix.mat4.transpose(normalMatrix, normalMatrix);
 
     const transformedPositions = new Float32Array(originalPositions); // fresh copy
-
-
-
-
 
     // apply manual folds transformations
     for (const fold of manualFolds) {
@@ -563,11 +558,7 @@ async function main() {
 
     // render shadow plane 
     gl.uniform1i(uniformLocations.isShadow, 0);
-    // gl.uniform3fv(uniformLocations.baseColor, [7, 6, 5]); // light wood color
     gl.uniform3fv(uniformLocations.baseColor, [5, 6, 4.5]); // light green color
-    // gl.uniform3fv(uniformLocations.baseColor, [0.8, 0.9, 0.75]); // actual light green
-
-
 
     gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlanePositionBuffer);
     gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
@@ -577,14 +568,11 @@ async function main() {
     gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.normal);
 
-    gl.drawArrays(gl.TRIANGLES, 0, shadowPlane.positions.length / 3);
+    gl.drawArrays(gl.TRIANGLES, 0, shadowPlane.positions.length / 3); // ground
+
 
     // render paper shadow
     gl.uniform1i(uniformLocations.isShadow, 1);
-    // gl.uniform3fv(uniformLocations.baseColor, [10, 0, 0]); // dark shadow
-    // gl.uniform3fv(uniformLocations.baseColor, [0.3, 0.3, 0.3]); // natural grey shadow
-    // const shadowIntensity = 0.2 + 0.1 * Math.sin(time * 0.3); // varies shadow darkness
-    // gl.uniform3fv(uniformLocations.baseColor, [shadowIntensity, shadowIntensity, shadowIntensity]);
 
 
     const shadowPositions = createShadowVertices(originalPositions, transformedPositions, lightWorldPos);
@@ -599,22 +587,11 @@ async function main() {
     gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.normal);
 
-    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3);
+
+    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3); // shadow on the ground
 
     // render the paper object
     gl.uniform1i(uniformLocations.isShadow, 0);
-
-    // gl.uniform3fv(uniformLocations.baseColor, [0.9, 0.85, 0.8]);
-    // gl.uniform3fv(uniformLocations.baseColor, [1, 0, 1]);
-
-    // dynamic base color 
-    const hue = time * 0.1;
-    const baseColor = [
-      5 + Math.sin(hue),        // Light pink base (0.9-1.0)
-      1 + Math.sin(hue + Math.PI / 2),  // Pink-purple mix (0.6-0.9)
-      3 + Math.sin(hue + Math.PI)         // Purple tint (0.8-1.0)
-    ];
-    gl.uniform3fv(uniformLocations.baseColor, baseColor);
 
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -627,10 +604,7 @@ async function main() {
     gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.normal);
 
-
-
-    // draw
-    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3);
+    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3); // paper
 
     requestAnimationFrame(render);
   }
