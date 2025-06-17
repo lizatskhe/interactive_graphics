@@ -2,8 +2,6 @@ console.log("starting");
 
 const canvas = document.getElementById("glcanvas");
 const gl = canvas.getContext("webgl", { alpha: true });
-gl.clearColor(0.0, 0.0, 0.0, 0.0); // transparent black
-gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 gl.viewport(0, 0, canvas.width, canvas.height);
@@ -41,7 +39,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 
-// load shaders
 async function loadShaderSource(url) {
   const response = await fetch(url);
   return await response.text();
@@ -81,7 +78,7 @@ function compileShader(type, source) {
 console.log("shader program initialized");
 
 
-// create a square
+// create a square paper
 function createPaperGeometry(subdivisions = 10, scale = 0.3) { // with a scale parameter
   const positions = [];
   const normals = [];
@@ -100,7 +97,7 @@ function createPaperGeometry(subdivisions = 10, scale = 0.3) { // with a scale p
       positions.push(x0, y0, z0, x1, y1, z0, x1, y1, z1);
       positions.push(x0, y0, z0, x1, y1, z1, x0, y0, z1);
 
-      // normals pointing up
+      // normals pointing up - for lighting
       for (let k = 0; k < 6; k++) {
         normals.push(0, 1, 0);
       }
@@ -133,6 +130,7 @@ function createShadowPlane() {
   };
 }
 
+//project each vertex onto the shadow plane
 function createShadowVertices(originalPositions, transformedPositions, lightPos) {
   const shadowPositions = [];
   const planeY = -0.49; // slightly above the shadow plane to avoid z-fighting
@@ -151,9 +149,10 @@ function createShadowVertices(originalPositions, transformedPositions, lightPos)
       vertex[2] - lightPos[2]
     ];
 
-    // find intersection with y = planeY plane
+    // find intersection with y = planeY plane (where ray intersects the shadow plane)
     const t = (planeY - lightPos[1]) / lightToVertex[1];
 
+    // projected x and z coordinates
     const shadowX = lightPos[0] + t * lightToVertex[0];
     const shadowZ = lightPos[2] + t * lightToVertex[2];
 
@@ -169,21 +168,21 @@ let manualFolds = [
   // OUTER PETALS (4 petals from corners)
   // step 1: fold top-left petal upward
   {
-    axis: [-0.707, 0, -0.707], // diagonal axis (corrected direction)
-    pivot: [-0.05, 0, 0.05], // top-left quadrant pivot
-    angle: 0,
-    targetAngle: Math.PI / 2, // 60 degree fold
+    axis: [-0.707, 0, -0.707], // fold axis
+    pivot: [-0.05, 0, 0.05], // fold origin point
+    angle: 0, // current angle
+    targetAngle: Math.PI / 2, 
     speed: 1.0,
-    condition: (pos) => pos[0] < -0.08 && pos[2] > 0.08, // top-left quadrant
+    condition: (pos) => pos[0] < -0.08 && pos[2] > 0.08, // which part of the paper to fold
     active: false
   },
 
   // // step 2: fold top-right petal upward 
   {
-    axis: [-0.707, 0, 0.707], // diagonal axis (opposite direction)
+    axis: [-0.707, 0, 0.707], 
     pivot: [0.05, 0, 0.05], // top-right quadrant pivot
     angle: 0,
-    targetAngle: Math.PI / 2, // 60 degree fold
+    targetAngle: Math.PI / 2, 
     speed: 1.0,
     condition: (pos) => pos[0] > 0.08 && pos[2] > 0.08, // top-right quadrant
     active: false
@@ -191,10 +190,10 @@ let manualFolds = [
 
   // step 3: fold bottom-left petal upward
   {
-    axis: [0.707, 0, -0.707], // diagonal axis
+    axis: [0.707, 0, -0.707], 
     pivot: [-0.05, 0, -0.05], // bottom-left quadrant pivot
     angle: 0,
-    targetAngle: Math.PI / 2, // 60 degree fold
+    targetAngle: Math.PI / 2, 
     speed: 1.0,
     condition: (pos) => pos[0] < -0.08 && pos[2] < -0.08, // bottom-left quadrant
     active: false
@@ -202,10 +201,10 @@ let manualFolds = [
 
   // step 4: fold bottom-right petal upward
   {
-    axis: [0.707, 0, 0.707], // diagonal axis (corrected direction)
+    axis: [0.707, 0, 0.707], 
     pivot: [0.05, 0, -0.05], // bottom-right quadrant pivot
     angle: 0,
-    targetAngle: Math.PI / 2, // 60 degree fold
+    targetAngle: Math.PI / 2, 
     speed: 1.0,
     condition: (pos) => pos[0] > 0.08 && pos[2] < -0.08, // bottom-right quadrant
     active: false
@@ -213,10 +212,10 @@ let manualFolds = [
   // INNER PETALS (4 additional petals from flat areas)
   // step 5: fold left inner petal (between top-left and bottom-left)
   {
-    axis: [0, 0, -1], // fold along Z axis
+    axis: [0, 0, -1], 
     pivot: [-0.12, 0, 0], // left edge
     angle: 0,
-    targetAngle: Math.PI / 3, // 60 degrees for inner petals
+    targetAngle: Math.PI / 3, 
     speed: 1.2,
     condition: (pos) => pos[0] < -0.05 && Math.abs(pos[2]) < 0.05,
     active: false
@@ -224,7 +223,7 @@ let manualFolds = [
 
   // step 6: fold right inner petal 
   {
-    axis: [0, 0, 1], // fold along Z axis (opposite direction)
+    axis: [0, 0, 1], 
     pivot: [0.12, 0, 0], // right edge
     angle: 0,
     targetAngle: Math.PI / 3,
@@ -235,7 +234,7 @@ let manualFolds = [
 
   // step 7: fold top inner petal
   {
-    axis: [-1, 0, 0], // fold along X axis
+    axis: [-1, 0, 0], 
     pivot: [0, 0, 0.12], // top edge
     angle: 0,
     targetAngle: Math.PI / 3,
@@ -246,7 +245,7 @@ let manualFolds = [
 
   // step 8: fold bottom inner petal
   {
-    axis: [1, 0, 0], // fold along X axis (opposite direction)
+    axis: [1, 0, 0], 
     pivot: [0, 0, -0.12], // bottom edge
     angle: 0,
     targetAngle: Math.PI / 3,
@@ -313,7 +312,7 @@ async function main() {
   const shaderProgram = await initShaders();
   gl.useProgram(shaderProgram);
 
-  const attribLocations = {
+  const attribLocations = { // shader attributes
     position: gl.getAttribLocation(shaderProgram, "aPosition"),
     normal: gl.getAttribLocation(shaderProgram, "aNormal"),
   };
@@ -352,7 +351,7 @@ async function main() {
       1.5,
       -1.5 * Math.sin(time * 0.3 + Math.PI),
 
-      // accent light (subtle, high up)
+      // // accent light (subtle, high up)
       0.5 * Math.sin(time * 0.7),
       3.0,
       0.5 * Math.cos(time * 0.7)
@@ -617,4 +616,3 @@ async function main() {
 }
 
 main();
-
