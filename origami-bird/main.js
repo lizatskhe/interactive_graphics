@@ -109,8 +109,8 @@ class ParticleSystem {
   createBuffers() {
     // a simple quad for each particle
     const quadVertices = [
-      -1, -1, 0,  1, -1, 0,  1,  1, 0,
-      -1, -1, 0,  1,  1, 0, -1,  1, 0
+      -1, -1, 0, 1, -1, 0, 1, 1, 0,
+      -1, -1, 0, 1, 1, 0, -1, 1, 0
     ];
 
     this.positions = [];
@@ -133,7 +133,7 @@ class ParticleSystem {
 
     this.positionBuffer = gl.createBuffer();
     this.quadBuffer = gl.createBuffer();
-    
+
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.quadGeometry, gl.STATIC_DRAW);
   }
@@ -145,60 +145,60 @@ class ParticleSystem {
 
     for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];
-      
+
       // update position
       p.position[0] += p.velocity[0];
       p.position[1] += p.velocity[1];
       p.position[2] += p.velocity[2];
-      
+
       // update life for pulsing effect
       p.life += p.lifeSpeed * deltaTime;
       if (p.life > Math.PI * 2) p.life = 0;
-      
+
       // update rotation
       p.rotation += p.rotationSpeed * deltaTime;
-      
+
       // reset particles that drift too far
       if (p.position[1] > 3) {
         p.position[1] = -0.5;
         p.position[0] = (Math.random() - 0.5) * 4;
         p.position[2] = (Math.random() - 0.5) * 4;
       }
-      
+
       // swaying motion
       p.velocity[0] += (Math.random() - 0.5) * 0.0001;
       p.velocity[2] += (Math.random() - 0.5) * 0.0001;
-      
+
       // clamp velocities
       p.velocity[0] = Math.max(-0.03, Math.min(0.03, p.velocity[0]));
       p.velocity[2] = Math.max(-0.03, Math.min(0.03, p.velocity[2]));
-      
+
       const pulseAlpha = (Math.sin(p.life) + 1) * 0.3 + 0.2; // 0.2 to 0.8
-      
+
       // create quad vertices for this particle
       const cos_r = Math.cos(p.rotation);
       const sin_r = Math.sin(p.rotation);
-      
+
       const quadVerts = [
         [-p.size, -p.size], [p.size, -p.size], [p.size, p.size],
         [-p.size, -p.size], [p.size, p.size], [-p.size, p.size]
       ];
-      
+
       for (let j = 0; j < 6; j++) {
         const localX = quadVerts[j][0];
         const localY = quadVerts[j][1];
         const rotatedX = localX * cos_r - localY * sin_r;
         const rotatedY = localX * sin_r + localY * cos_r;
-        
+
         this.positionArray[posIndex++] = p.position[0] + rotatedX;
         this.positionArray[posIndex++] = p.position[1] + rotatedY;
         this.positionArray[posIndex++] = p.position[2];
-        
+
         this.sizeArray[sizeIndex++] = p.size;
         this.alphaArray[alphaIndex++] = pulseAlpha;
       }
     }
-    
+
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.positionArray, gl.DYNAMIC_DRAW);
   }
@@ -208,11 +208,11 @@ class ParticleSystem {
     gl.uniform1i(uniformLocations.isFlower, 0);
     gl.uniform1i(uniformLocations.isParticle, 1);
     gl.uniform3fv(uniformLocations.baseColor, [1.0, 0.9, 0.3]); // golden pollen color
-    
+
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
     gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.position);
-    
+
     gl.drawArrays(gl.TRIANGLES, 0, this.count * 6);
   }
 }
@@ -540,8 +540,6 @@ async function main() {
       2 + Math.sin(time * 0.3),
       2 * Math.sin(time * 0.5)
     );
-    const lightViewPos = glMatrix.vec3.create();
-    glMatrix.vec3.transformMat4(lightViewPos, lightWorldPos, viewMatrix);
 
     const cameraWorldPos = [
       Math.sin(time * 0.2) * 0.1,
@@ -551,9 +549,17 @@ async function main() {
     const cameraViewPos = glMatrix.vec3.create();
     glMatrix.vec3.transformMat4(cameraViewPos, cameraWorldPos, viewMatrix);
 
-    gl.uniform3fv(uniformLocations.lightPos, lightViewPos);
-    gl.uniform3fv(uniformLocations.lightColor, [1,1 , 1]);
-    gl.uniform1f(uniformLocations.lightIntensity, 1.2); 
+    // transform light to model space (same as vertices)
+    const lightModelPos = glMatrix.vec3.create();
+    const inverseModelView = glMatrix.mat4.create();
+    glMatrix.mat4.invert(inverseModelView, modelViewMatrix);
+    glMatrix.vec3.transformMat4(lightModelPos, lightWorldPos, inverseModelView);
+
+    gl.uniform3fv(uniformLocations.lightPos, lightModelPos);
+
+
+    gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
+    gl.uniform1f(uniformLocations.lightIntensity, 1.2);
     gl.uniform3fv(uniformLocations.viewPos, cameraViewPos);
 
 
