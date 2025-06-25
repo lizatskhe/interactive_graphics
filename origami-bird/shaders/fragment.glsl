@@ -3,9 +3,9 @@ precision mediump float;
 varying vec3 vPosition;
 varying vec3 vNormal;
 
-uniform vec3 uLightPositions[3];
-uniform vec3 uLightColors[3];
-uniform float uLightIntensities[3];
+uniform vec3 uLightPosition;
+uniform vec3 uLightColor;
+uniform float uLightIntensity;
 
 uniform vec3 uBaseColor;
 uniform float uShininess;
@@ -16,8 +16,8 @@ uniform int uIsShadow;
 uniform int uIsFlower;
 uniform float uTime;
 
-uniform float uBloomThreshold;
-uniform float uBloomIntensity;
+
+uniform bool uIsParticle;
 
 vec3 calculatePointLight(vec3 lightPos, vec3 lightColor, float intensity, vec3 normal, vec3 fragPos, vec3 viewDir) {
     vec3 lightDir = normalize(lightPos - fragPos);
@@ -39,10 +39,10 @@ vec3 calculatePointLight(vec3 lightPos, vec3 lightColor, float intensity, vec3 n
 vec3 createGradientColor(vec3 baseColor, vec3 position) {
     float gradientFactor = smoothstep(-0.2, 0.3, position.y);
     
-    vec3 bottomColor = vec3(0, 3, 1);  // green
-    vec3 topColor = vec3(15, 0, 10);    // beautiful pink-purple
+    vec3 bottomColor = vec3(0, 0.3, 0.1);  
+    vec3 topColor = vec3(1, 0.2, 0.9);    
 
-        vec3 gradientColor = mix(bottomColor, topColor, gradientFactor);
+    vec3 gradientColor = mix(bottomColor, topColor, gradientFactor);
     
     float hue = uTime * 0.1;
     vec3 colorVariation = vec3(
@@ -55,6 +55,11 @@ vec3 createGradientColor(vec3 baseColor, vec3 position) {
 }
 
 void main() {
+    if (uIsParticle) {
+        gl_FragColor = vec4(uBaseColor, 0.6); // semi-transparent particles
+        return;
+    }
+
     if (uIsShadow == 1) {
         gl_FragColor = vec4(0.07, 0.15, 0.07, 0.7); // dark green shadow
         return;
@@ -69,21 +74,18 @@ void main() {
     // ambient lighting
     vec3 ambient = 0.1 * baseColor;
     
-    // lighting from multiple sources
+    // lighting from single source
     vec3 lighting = ambient;
     
-    for (int i = 0; i < 3; i++) {
-        lighting += calculatePointLight(
-            uLightPositions[i], 
-            uLightColors[i], 
-            uLightIntensities[i], 
-            normal, 
-            vPosition, 
-            viewDir
-        ) * baseColor;  // Use baseColor (gradient for flower, uniform for ground)
-    }
+    lighting += calculatePointLight(
+        uLightPosition, 
+        uLightColor, 
+        uLightIntensity, 
+        normal, 
+        vPosition, 
+        viewDir
+    ) * baseColor;
     
-    // subtle paper-like effects
     float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 2.0);
     vec3 fresnelColor = vec3(0.9, 0.95, 1.0) * fresnel * 0.3;
     lighting += fresnelColor;
@@ -96,26 +98,7 @@ void main() {
         lighting += vec3(1.0, 0.85, 0.7) * sparkle * 0.5;
     }
     
-    // brightness for bloom
-    float brightness = dot(lighting, vec3(0.299, 0.587, 0.114));
-    
     vec3 finalColor = lighting;
-    
-    // bloom effect that adapts to gradient (only for flower)
-    if (brightness > uBloomThreshold) {
-        float bloomFactor = (brightness - uBloomThreshold) * uBloomIntensity;
-        if (uIsFlower == 1) {
-            // bloom color transitions from green-tinted at bottom to pink-purple at top
-            vec3 bloomTint = mix(
-                vec3(0.2, 0.4, 0.2),  // Green bloom for bottom
-                vec3(0.4, 0.2, 0.4),  // Pink-purple bloom for top
-                smoothstep(-0.3, 0.4, vPosition.y)
-            );
-            finalColor += bloomTint * bloomFactor;
-        } else {
-            finalColor += vec3(0.3, 0.3, 0.2) * bloomFactor;
-        }
-    }
     
     gl_FragColor = vec4(finalColor, 1.0);
 }
