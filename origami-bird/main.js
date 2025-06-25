@@ -171,7 +171,7 @@ let manualFolds = [
     axis: [-0.707, 0, -0.707], // fold axis
     pivot: [-0.05, 0, 0.05], // fold origin point
     angle: 0, // current angle
-    targetAngle: Math.PI / 2, 
+    targetAngle: Math.PI / 2,
     speed: 1.0,
     condition: (pos) => pos[0] < -0.08 && pos[2] > 0.08, // which part of the paper to fold
     active: false
@@ -179,10 +179,10 @@ let manualFolds = [
 
   // // step 2: fold top-right petal upward 
   {
-    axis: [-0.707, 0, 0.707], 
+    axis: [-0.707, 0, 0.707],
     pivot: [0.05, 0, 0.05], // top-right quadrant pivot
     angle: 0,
-    targetAngle: Math.PI / 2, 
+    targetAngle: Math.PI / 2,
     speed: 1.0,
     condition: (pos) => pos[0] > 0.08 && pos[2] > 0.08, // top-right quadrant
     active: false
@@ -190,10 +190,10 @@ let manualFolds = [
 
   // step 3: fold bottom-left petal upward
   {
-    axis: [0.707, 0, -0.707], 
+    axis: [0.707, 0, -0.707],
     pivot: [-0.05, 0, -0.05], // bottom-left quadrant pivot
     angle: 0,
-    targetAngle: Math.PI / 2, 
+    targetAngle: Math.PI / 2,
     speed: 1.0,
     condition: (pos) => pos[0] < -0.08 && pos[2] < -0.08, // bottom-left quadrant
     active: false
@@ -201,10 +201,10 @@ let manualFolds = [
 
   // step 4: fold bottom-right petal upward
   {
-    axis: [0.707, 0, 0.707], 
+    axis: [0.707, 0, 0.707],
     pivot: [0.05, 0, -0.05], // bottom-right quadrant pivot
     angle: 0,
-    targetAngle: Math.PI / 2, 
+    targetAngle: Math.PI / 2,
     speed: 1.0,
     condition: (pos) => pos[0] > 0.08 && pos[2] < -0.08, // bottom-right quadrant
     active: false
@@ -212,10 +212,10 @@ let manualFolds = [
   // INNER PETALS (4 additional petals from flat areas)
   // step 5: fold left inner petal (between top-left and bottom-left)
   {
-    axis: [0, 0, -1], 
+    axis: [0, 0, -1],
     pivot: [-0.12, 0, 0], // left edge
     angle: 0,
-    targetAngle: Math.PI / 3, 
+    targetAngle: Math.PI / 3,
     speed: 1.2,
     condition: (pos) => pos[0] < -0.05 && Math.abs(pos[2]) < 0.05,
     active: false
@@ -223,7 +223,7 @@ let manualFolds = [
 
   // step 6: fold right inner petal 
   {
-    axis: [0, 0, 1], 
+    axis: [0, 0, 1],
     pivot: [0.12, 0, 0], // right edge
     angle: 0,
     targetAngle: Math.PI / 3,
@@ -234,7 +234,7 @@ let manualFolds = [
 
   // step 7: fold top inner petal
   {
-    axis: [-1, 0, 0], 
+    axis: [-1, 0, 0],
     pivot: [0, 0, 0.12], // top edge
     angle: 0,
     targetAngle: Math.PI / 3,
@@ -245,7 +245,7 @@ let manualFolds = [
 
   // step 8: fold bottom inner petal
   {
-    axis: [1, 0, 0], 
+    axis: [1, 0, 0],
     pivot: [0, 0, -0.12], // bottom edge
     angle: 0,
     targetAngle: Math.PI / 3,
@@ -259,8 +259,6 @@ let manualFolds = [
 let currentFoldStep = 0;
 let stepDelay = 1000; // 1 second delay between steps
 let lastStepTime = 0;
-
-let currentFoldIndex = 0;
 
 
 function createFolds(positions, subdivisions) {
@@ -321,80 +319,21 @@ async function main() {
     projection: gl.getUniformLocation(shaderProgram, "uProjectionMatrix"),
     modelView: gl.getUniformLocation(shaderProgram, "uModelViewMatrix"),
     normalMatrix: gl.getUniformLocation(shaderProgram, "uNormalMatrix"),
-
     lightPos: gl.getUniformLocation(shaderProgram, "uLightPosition"),
     lightColor: gl.getUniformLocation(shaderProgram, "uLightColor"),
-    lightIntensities: gl.getUniformLocation(shaderProgram, "uLightIntensities"),
-
     baseColor: gl.getUniformLocation(shaderProgram, "uBaseColor"),
     shininess: gl.getUniformLocation(shaderProgram, "uShininess"),
-    specularStrength: gl.getUniformLocation(shaderProgram, "uSpecularStrength"),
-
     viewPos: gl.getUniformLocation(shaderProgram, "uViewPos"),
-    time: gl.getUniformLocation(shaderProgram, "uTime"),
-    bloomThreshold: gl.getUniformLocation(shaderProgram, "uBloomThreshold"),
-    bloomIntensity: gl.getUniformLocation(shaderProgram, "uBloomIntensity"),
     isShadow: gl.getUniformLocation(shaderProgram, "uIsShadow"),
     isFlower: gl.getUniformLocation(shaderProgram, "uIsFlower"),
   };
 
-  function setupEnhancedLighting(time) {
-    // three dynamic light sources
-    const lightPositions = [
-      // main rotating light (warm)
-      2.5 * Math.cos(time * 0.5),
-      2.0 + Math.sin(time * 0.3),
-      2.5 * Math.sin(time * 0.5),
 
-      // secondary light (cool, counter-rotating)
-      -1.5 * Math.cos(time * 0.3 + Math.PI),
-      1.5,
-      -1.5 * Math.sin(time * 0.3 + Math.PI),
-
-      // // accent light (subtle, high up)
-      0.5 * Math.sin(time * 0.7),
-      3.0,
-      0.5 * Math.cos(time * 0.7)
-    ];
-
-    const lightColors = [
-      // warm main light
-      1.0, 0.9, 0.7,
-
-      // cool secondary light
-      0.7, 0.8, 1.0,
-
-      // soft accent light
-      0.9, 0.95, 1.0
-    ];
-
-    const lightIntensities = [
-      1.2,  // main light
-      0.8,  // secondary light
-      0.4   // accent light
-    ];
-
-    gl.uniform3fv(uniformLocations.lightPositions, lightPositions);
-    gl.uniform3fv(uniformLocations.lightColors, lightColors);
-    gl.uniform1fv(uniformLocations.lightIntensities, lightIntensities);
-
-    // paper-like appearance
-    gl.uniform1f(uniformLocations.shininess, 32.0);
-    gl.uniform1f(uniformLocations.specularStrength, 0.3);
-
-    // bloom effect settings
-    gl.uniform1f(uniformLocations.bloomThreshold, 0.8);
-    gl.uniform1f(uniformLocations.bloomIntensity, 1.5);
-
-    // time for animated effects
-    gl.uniform1f(uniformLocations.time, time);
-  }
-
-  gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
 
   const { positions, normals } = createPaperGeometry(20, 0.5);
   const originalPositions = new Float32Array(positions); // copy for reference
   const folds = createFolds(originalPositions, 20);
+
 
   const shadowPlane = createShadowPlane();
 
@@ -475,7 +414,8 @@ async function main() {
       }
     }
 
-    setupEnhancedLighting(time);
+    gl.uniform1f(uniformLocations.shininess, 32.0);
+
 
     // perspective projection
     const aspect = canvas.width / canvas.height;
@@ -505,13 +445,10 @@ async function main() {
       0.1,
       0.8
     ];
-    gl.uniform3fv(uniformLocations.viewPos, cameraWorldPos);
     const cameraViewPos = glMatrix.vec3.create();
     glMatrix.vec3.transformMat4(cameraViewPos, cameraWorldPos, viewMatrix);
 
     gl.uniform3fv(uniformLocations.lightPos, lightViewPos);
-    gl.uniform3fv(uniformLocations.viewPos, cameraViewPos);
-
 
     const normalMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(normalMatrix, modelViewMatrix);
@@ -552,13 +489,9 @@ async function main() {
     gl.uniformMatrix4fv(uniformLocations.modelView, false, modelViewMatrix);
     gl.uniformMatrix4fv(uniformLocations.normalMatrix, false, normalMatrix);
 
-    gl.uniform3fv(uniformLocations.lightPos, lightWorldPos);
-    gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
-    gl.uniform3fv(uniformLocations.viewPos, [0, 0, 0]);
-
     // render shadow plane 
     gl.uniform1i(uniformLocations.isShadow, 0);
-    gl.uniform1i(uniformLocations.isFlower, 0); 
+    gl.uniform1i(uniformLocations.isFlower, 0);
     gl.uniform3fv(uniformLocations.baseColor, [5, 6, 4.5]); // light green color
 
     gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlanePositionBuffer);
@@ -570,7 +503,6 @@ async function main() {
     gl.enableVertexAttribArray(attribLocations.normal);
 
     gl.drawArrays(gl.TRIANGLES, 0, shadowPlane.positions.length / 3); // ground
-
 
     // render paper shadow
     gl.uniform1i(uniformLocations.isShadow, 1);
@@ -594,7 +526,7 @@ async function main() {
 
     // render the paper object
     gl.uniform1i(uniformLocations.isShadow, 0);
-    gl.uniform1i(uniformLocations.isFlower, 1); 
+    gl.uniform1i(uniformLocations.isFlower, 1);
 
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
