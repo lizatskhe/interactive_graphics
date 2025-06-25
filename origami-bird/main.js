@@ -93,7 +93,7 @@ class ParticleSystem {
           (Math.random() - 0.5) * 4   // z: depth variation
         ],
         velocity: [
-          (Math.random() - 0.5) * 0.02,  // gentle drift
+          (Math.random() - 0.5) * 0.02,  // drift
           Math.random() * 0.01 + 0.005,  // slow upward float
           (Math.random() - 0.5) * 0.02
         ],
@@ -541,21 +541,29 @@ async function main() {
       2 * Math.sin(time * 0.5)
     );
 
-    const cameraWorldPos = [
+    const cameraWorldPos = glMatrix.vec3.fromValues(
       Math.sin(time * 0.2) * 0.1,
       0.1,
       0.8
-    ];
-    const cameraViewPos = glMatrix.vec3.create();
-    glMatrix.vec3.transformMat4(cameraViewPos, cameraWorldPos, viewMatrix);
+    );
 
-    // transform light to model space (same as vertices)
+    const lightViewPos = glMatrix.vec3.create();
+    glMatrix.vec3.transformMat4(lightViewPos, lightWorldPos, modelViewMatrix);
+
+    const cameraViewPos = glMatrix.vec3.fromValues(0, 0, 0);
+
+    gl.uniform3fv(uniformLocations.lightPos, lightViewPos);
+    gl.uniform3fv(uniformLocations.viewPos, cameraViewPos);
+
+
+    console.log("Light World Pos:", lightWorldPos);
+    console.log("Light View Pos:", lightViewPos);
+
     const lightModelPos = glMatrix.vec3.create();
     const inverseModelView = glMatrix.mat4.create();
     glMatrix.mat4.invert(inverseModelView, modelViewMatrix);
     glMatrix.vec3.transformMat4(lightModelPos, lightWorldPos, inverseModelView);
 
-    gl.uniform3fv(uniformLocations.lightPos, lightModelPos);
 
 
     gl.uniform3fv(uniformLocations.lightColor, [1, 1, 1]);
