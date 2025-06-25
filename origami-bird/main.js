@@ -38,7 +38,6 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 
-
 async function loadShaderSource(url) {
   const response = await fetch(url);
   return await response.text();
@@ -77,27 +76,164 @@ function compileShader(type, source) {
 }
 console.log("shader program initialized");
 
+class ParticleSystem {
+  constructor(count = 50) {
+    this.particles = [];
+    this.count = count;
+    this.initParticles();
+    this.createBuffers();
+  }
+
+  initParticles() {
+    for (let i = 0; i < this.count; i++) {
+      this.particles.push({
+        position: [
+          (Math.random() - 0.5) * 4,  // x: spread around scene
+          Math.random() * 2 + 0.5,   // y: float above ground
+          (Math.random() - 0.5) * 4   // z: depth variation
+        ],
+        velocity: [
+          (Math.random() - 0.5) * 0.02,  // gentle drift
+          Math.random() * 0.01 + 0.005,  // slow upward float
+          (Math.random() - 0.5) * 0.02
+        ],
+        size: Math.random() * 0.005 + 0.002,  // small particles
+        life: Math.random(),  // for pulsing effect
+        lifeSpeed: Math.random() * 0.5 + 0.5,
+        rotationSpeed: (Math.random() - 0.5) * 2,
+        rotation: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  createBuffers() {
+    // a simple quad for each particle
+    const quadVertices = [
+      -1, -1, 0,  1, -1, 0,  1,  1, 0,
+      -1, -1, 0,  1,  1, 0, -1,  1, 0
+    ];
+
+    this.positions = [];
+    this.sizes = [];
+    this.alphas = [];
+
+    // update these every frame
+    for (let i = 0; i < this.count; i++) {
+      for (let j = 0; j < 6; j++) { // 6 vertices per particle
+        this.positions.push(0, 0, 0); // will be updated
+        this.sizes.push(0.01); // will be updated
+        this.alphas.push(1.0); // will be updated
+      }
+    }
+
+    this.quadGeometry = new Float32Array(quadVertices);
+    this.positionArray = new Float32Array(this.positions);
+    this.sizeArray = new Float32Array(this.sizes);
+    this.alphaArray = new Float32Array(this.alphas);
+
+    this.positionBuffer = gl.createBuffer();
+    this.quadBuffer = gl.createBuffer();
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, this.quadGeometry, gl.STATIC_DRAW);
+  }
+
+  update(deltaTime) {
+    let posIndex = 0;
+    let sizeIndex = 0;
+    let alphaIndex = 0;
+
+    for (let i = 0; i < this.particles.length; i++) {
+      const p = this.particles[i];
+      
+      // update position
+      p.position[0] += p.velocity[0];
+      p.position[1] += p.velocity[1];
+      p.position[2] += p.velocity[2];
+      
+      // update life for pulsing effect
+      p.life += p.lifeSpeed * deltaTime;
+      if (p.life > Math.PI * 2) p.life = 0;
+      
+      // update rotation
+      p.rotation += p.rotationSpeed * deltaTime;
+      
+      // reset particles that drift too far
+      if (p.position[1] > 3) {
+        p.position[1] = -0.5;
+        p.position[0] = (Math.random() - 0.5) * 4;
+        p.position[2] = (Math.random() - 0.5) * 4;
+      }
+      
+      // swaying motion
+      p.velocity[0] += (Math.random() - 0.5) * 0.0001;
+      p.velocity[2] += (Math.random() - 0.5) * 0.0001;
+      
+      // clamp velocities
+      p.velocity[0] = Math.max(-0.03, Math.min(0.03, p.velocity[0]));
+      p.velocity[2] = Math.max(-0.03, Math.min(0.03, p.velocity[2]));
+      
+      const pulseAlpha = (Math.sin(p.life) + 1) * 0.3 + 0.2; // 0.2 to 0.8
+      
+      // create quad vertices for this particle
+      const cos_r = Math.cos(p.rotation);
+      const sin_r = Math.sin(p.rotation);
+      
+      const quadVerts = [
+        [-p.size, -p.size], [p.size, -p.size], [p.size, p.size],
+        [-p.size, -p.size], [p.size, p.size], [-p.size, p.size]
+      ];
+      
+      for (let j = 0; j < 6; j++) {
+        const localX = quadVerts[j][0];
+        const localY = quadVerts[j][1];
+        const rotatedX = localX * cos_r - localY * sin_r;
+        const rotatedY = localX * sin_r + localY * cos_r;
+        
+        this.positionArray[posIndex++] = p.position[0] + rotatedX;
+        this.positionArray[posIndex++] = p.position[1] + rotatedY;
+        this.positionArray[posIndex++] = p.position[2];
+        
+        this.sizeArray[sizeIndex++] = p.size;
+        this.alphaArray[alphaIndex++] = pulseAlpha;
+      }
+    }
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, this.positionArray, gl.DYNAMIC_DRAW);
+  }
+
+  render(attribLocations, uniformLocations) {
+    gl.uniform1i(uniformLocations.isShadow, 0);
+    gl.uniform1i(uniformLocations.isFlower, 0);
+    gl.uniform1i(uniformLocations.isParticle, 1);
+    gl.uniform3fv(uniformLocations.baseColor, [1.0, 0.9, 0.3]); // golden pollen color
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+    gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attribLocations.position);
+    
+    gl.drawArrays(gl.TRIANGLES, 0, this.count * 6);
+  }
+}
 
 // create a square paper
-function createPaperGeometry(subdivisions = 10, scale = 0.3) { // with a scale parameter
+function createPaperGeometry(subdivisions = 10, scale = 0.3) {
   const positions = [];
   const normals = [];
 
   for (let i = 0; i < subdivisions; i++) {
     for (let j = 0; j < subdivisions; j++) {
-      // scale down the coordinates
       const x0 = (i / subdivisions - 0.5) * scale;
       const x1 = ((i + 1) / subdivisions - 0.5) * scale;
-      const y0 = 0; // keep Y at 0 (flat)
+      const y0 = 0;
       const y1 = 0;
       const z0 = (j / subdivisions - 0.5) * scale;
       const z1 = ((j + 1) / subdivisions - 0.5) * scale;
 
-      // two triangles per quad
       positions.push(x0, y0, z0, x1, y1, z0, x1, y1, z1);
       positions.push(x0, y0, z0, x1, y1, z1, x0, y0, z1);
 
-      // normals pointing up - for lighting
       for (let k = 0; k < 6; k++) {
         normals.push(0, 1, 0);
       }
@@ -130,10 +266,9 @@ function createShadowPlane() {
   };
 }
 
-//project each vertex onto the shadow plane
 function createShadowVertices(originalPositions, transformedPositions, lightPos) {
   const shadowPositions = [];
-  const planeY = -0.49; // slightly above the shadow plane to avoid z-fighting
+  const planeY = -0.49;
 
   for (let i = 0; i < transformedPositions.length; i += 3) {
     const vertex = [
@@ -142,17 +277,14 @@ function createShadowVertices(originalPositions, transformedPositions, lightPos)
       transformedPositions[i + 2]
     ];
 
-    // project vertex onto the shadow plane using light position
     const lightToVertex = [
       vertex[0] - lightPos[0],
       vertex[1] - lightPos[1],
       vertex[2] - lightPos[2]
     ];
 
-    // find intersection with y = planeY plane (where ray intersects the shadow plane)
     const t = (planeY - lightPos[1]) / lightToVertex[1];
 
-    // projected x and z coordinates
     const shadowX = lightPos[0] + t * lightToVertex[0];
     const shadowZ = lightPos[2] + t * lightToVertex[2];
 
@@ -162,112 +294,92 @@ function createShadowVertices(originalPositions, transformedPositions, lightPos)
   return new Float32Array(shadowPositions);
 }
 
-
 // paper flower folding 
 let manualFolds = [
-  // OUTER PETALS (4 petals from corners)
-  // step 1: fold top-left petal upward
   {
-    axis: [-0.707, 0, -0.707], // fold axis
-    pivot: [-0.05, 0, 0.05], // fold origin point
-    angle: 0, // current angle
+    axis: [-0.707, 0, -0.707],
+    pivot: [-0.05, 0, 0.05],
+    angle: 0,
     targetAngle: Math.PI / 2,
     speed: 1.0,
-    condition: (pos) => pos[0] < -0.08 && pos[2] > 0.08, // which part of the paper to fold
+    condition: (pos) => pos[0] < -0.08 && pos[2] > 0.08,
     active: false
   },
-
-  // // step 2: fold top-right petal upward 
   {
     axis: [-0.707, 0, 0.707],
-    pivot: [0.05, 0, 0.05], // top-right quadrant pivot
+    pivot: [0.05, 0, 0.05],
     angle: 0,
     targetAngle: Math.PI / 2,
     speed: 1.0,
-    condition: (pos) => pos[0] > 0.08 && pos[2] > 0.08, // top-right quadrant
+    condition: (pos) => pos[0] > 0.08 && pos[2] > 0.08,
     active: false
   },
-
-  // step 3: fold bottom-left petal upward
   {
     axis: [0.707, 0, -0.707],
-    pivot: [-0.05, 0, -0.05], // bottom-left quadrant pivot
+    pivot: [-0.05, 0, -0.05],
     angle: 0,
     targetAngle: Math.PI / 2,
     speed: 1.0,
-    condition: (pos) => pos[0] < -0.08 && pos[2] < -0.08, // bottom-left quadrant
+    condition: (pos) => pos[0] < -0.08 && pos[2] < -0.08,
     active: false
   },
-
-  // step 4: fold bottom-right petal upward
   {
     axis: [0.707, 0, 0.707],
-    pivot: [0.05, 0, -0.05], // bottom-right quadrant pivot
+    pivot: [0.05, 0, -0.05],
     angle: 0,
     targetAngle: Math.PI / 2,
     speed: 1.0,
-    condition: (pos) => pos[0] > 0.08 && pos[2] < -0.08, // bottom-right quadrant
+    condition: (pos) => pos[0] > 0.08 && pos[2] < -0.08,
     active: false
   },
-  // INNER PETALS (4 additional petals from flat areas)
-  // step 5: fold left inner petal (between top-left and bottom-left)
   {
     axis: [0, 0, -1],
-    pivot: [-0.12, 0, 0], // left edge
+    pivot: [-0.12, 0, 0],
     angle: 0,
     targetAngle: Math.PI / 3,
     speed: 1.2,
     condition: (pos) => pos[0] < -0.05 && Math.abs(pos[2]) < 0.05,
     active: false
   },
-
-  // step 6: fold right inner petal 
   {
     axis: [0, 0, 1],
-    pivot: [0.12, 0, 0], // right edge
+    pivot: [0.12, 0, 0],
     angle: 0,
     targetAngle: Math.PI / 3,
     speed: 1.2,
     condition: (pos) => pos[0] > 0.05 && Math.abs(pos[2]) < 0.05,
     active: false
   },
-
-  // step 7: fold top inner petal
   {
     axis: [-1, 0, 0],
-    pivot: [0, 0, 0.12], // top edge
+    pivot: [0, 0, 0.12],
     angle: 0,
     targetAngle: Math.PI / 3,
     speed: 1.2,
     condition: (pos) => pos[2] > 0.05 && Math.abs(pos[0]) < 0.05,
     active: false
   },
-
-  // step 8: fold bottom inner petal
   {
     axis: [1, 0, 0],
-    pivot: [0, 0, -0.12], // bottom edge
+    pivot: [0, 0, -0.12],
     angle: 0,
     targetAngle: Math.PI / 3,
     speed: 1.2,
     condition: (pos) => pos[2] < -0.05 && Math.abs(pos[0]) < 0.05,
     active: false
   }
-
 ];
 
 let currentFoldStep = 0;
-let stepDelay = 1000; // 1 second delay between steps
+let stepDelay = 1000;
 let lastStepTime = 0;
-
 
 function createFolds(positions, subdivisions) {
   const folds = [];
   for (let i = 0; i < subdivisions; i++) {
     for (let j = 0; j < subdivisions; j++) {
-      const baseIndex = (i * subdivisions + j) * 6 * 3; // 6 vertices * 3 coords
+      const baseIndex = (i * subdivisions + j) * 6 * 3;
 
-      // compute the center of the quad
       let cx = 0, cy = 0, cz = 0;
       for (let k = 0; k < 6; k++) {
         cx += positions[baseIndex + k * 3 + 0];
@@ -276,13 +388,12 @@ function createFolds(positions, subdivisions) {
       }
       cx /= 6; cy /= 6; cz /= 6;
 
-      // create a fold region
       folds.push({
         indices: Array.from({ length: 6 }, (_, k) => baseIndex + k * 3),
         pivot: [cx, cy, cz],
-        axis: [1, 0, 0], // horizontal fold by default
+        axis: [1, 0, 0],
         angle: 0,
-        targetAngle: Math.PI / 2, // 90° fold
+        targetAngle: Math.PI / 2,
         speed: 1.0,
       });
     }
@@ -294,23 +405,22 @@ function createFolds(positions, subdivisions) {
 function rotatePointAroundAxis(point, pivot, axis, angle) {
   const out = glMatrix.vec3.create();
   const translated = glMatrix.vec3.create();
-  glMatrix.vec3.subtract(translated, point, pivot); // move to origin
+  glMatrix.vec3.subtract(translated, point, pivot);
 
   const rotationMatrix = glMatrix.mat4.create();
   glMatrix.mat4.fromRotation(rotationMatrix, angle, axis);
 
   glMatrix.vec3.transformMat4(translated, translated, rotationMatrix);
-  glMatrix.vec3.add(out, translated, pivot); // move back
+  glMatrix.vec3.add(out, translated, pivot);
 
   return out;
 }
-
 
 async function main() {
   const shaderProgram = await initShaders();
   gl.useProgram(shaderProgram);
 
-  const attribLocations = { // shader attributes
+  const attribLocations = {
     position: gl.getAttribLocation(shaderProgram, "aPosition"),
     normal: gl.getAttribLocation(shaderProgram, "aNormal"),
   };
@@ -321,26 +431,25 @@ async function main() {
     normalMatrix: gl.getUniformLocation(shaderProgram, "uNormalMatrix"),
     lightPos: gl.getUniformLocation(shaderProgram, "uLightPosition"),
     lightColor: gl.getUniformLocation(shaderProgram, "uLightColor"),
+    lightIntensity: gl.getUniformLocation(shaderProgram, "uLightIntensity"),
     baseColor: gl.getUniformLocation(shaderProgram, "uBaseColor"),
     shininess: gl.getUniformLocation(shaderProgram, "uShininess"),
     viewPos: gl.getUniformLocation(shaderProgram, "uViewPos"),
     isShadow: gl.getUniformLocation(shaderProgram, "uIsShadow"),
     isFlower: gl.getUniformLocation(shaderProgram, "uIsFlower"),
+    isParticle: gl.getUniformLocation(shaderProgram, "uIsParticle"),
   };
 
-
+  const particleSystem = new ParticleSystem(60);
+  console.log("particle system initialized with", particleSystem.count, "particles");
 
   const { positions, normals } = createPaperGeometry(20, 0.5);
-  const originalPositions = new Float32Array(positions); // copy for reference
+  const originalPositions = new Float32Array(positions);
   const folds = createFolds(originalPositions, 20);
-
 
   const shadowPlane = createShadowPlane();
 
-
   console.log("folds created:", folds.length);
-  console.log("first fold:", folds[0]);
-
 
   const positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -358,7 +467,6 @@ async function main() {
   gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlaneNormalBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, shadowPlane.normals, gl.STATIC_DRAW);
 
-  // shadow object buffers
   const shadowPositionBuffer = gl.createBuffer();
 
   gl.enable(gl.DEPTH_TEST);
@@ -368,16 +476,17 @@ async function main() {
   let previousTime = 0;
 
   function render(time) {
-    time *= 0.001; // convert to seconds
-
+    time *= 0.001;
     const deltaTime = time - previousTime;
     previousTime = time;
 
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    particleSystem.update(deltaTime);
 
     if (isFolding) {
       let allCurrentStepsDone = true;
 
-      // only animate currently active folds
       for (let i = 0; i < manualFolds.length; i++) {
         const fold = manualFolds[i];
 
@@ -391,15 +500,14 @@ async function main() {
         if (Math.abs(fold.angle - fold.targetAngle) > 0.01) {
           allCurrentStepsDone = false;
         } else {
-          fold.angle = fold.targetAngle; // snap if close
+          fold.angle = fold.targetAngle;
         }
       }
 
-      // if current step is done, move to next step after delay
       if (allCurrentStepsDone) {
         if (lastStepTime === 0) {
           lastStepTime = time;
-        } else if (time - lastStepTime > stepDelay / 1000) { // convert ms to seconds
+        } else if (time - lastStepTime > stepDelay / 1000) {
           currentFoldStep++;
 
           if (currentFoldStep < manualFolds.length) {
@@ -407,7 +515,7 @@ async function main() {
             lastStepTime = 0;
             console.log(`step ${currentFoldStep + 1}`);
           } else {
-            console.log("boat folding complete");
+            console.log("flower folding complete");
             isFolding = false;
           }
         }
@@ -416,20 +524,16 @@ async function main() {
 
     gl.uniform1f(uniformLocations.shininess, 32.0);
 
-
-    // perspective projection
     const aspect = canvas.width / canvas.height;
     const projectionMatrix = glMatrix.mat4.create();
     glMatrix.mat4.perspective(projectionMatrix, Math.PI / 3, aspect, 0.1, 100.0);
 
-    // camera + model
     const modelViewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.translate(modelViewMatrix, modelViewMatrix, [0, -0.1, -0.8]);
     glMatrix.mat4.rotateY(modelViewMatrix, modelViewMatrix, time * 0.2);
 
     const viewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(viewMatrix, modelViewMatrix);
-
 
     const lightWorldPos = glMatrix.vec3.fromValues(
       2 * Math.cos(time * 0.5),
@@ -439,9 +543,8 @@ async function main() {
     const lightViewPos = glMatrix.vec3.create();
     glMatrix.vec3.transformMat4(lightViewPos, lightWorldPos, viewMatrix);
 
-    // view position for specular calculations
     const cameraWorldPos = [
-      Math.sin(time * 0.2) * 0.1,  // subtle camera movement
+      Math.sin(time * 0.2) * 0.1,
       0.1,
       0.8
     ];
@@ -449,19 +552,21 @@ async function main() {
     glMatrix.vec3.transformMat4(cameraViewPos, cameraWorldPos, viewMatrix);
 
     gl.uniform3fv(uniformLocations.lightPos, lightViewPos);
+    gl.uniform3fv(uniformLocations.lightColor, [1,1 , 1]);
+    gl.uniform1f(uniformLocations.lightIntensity, 1.2); 
+    gl.uniform3fv(uniformLocations.viewPos, cameraViewPos);
+
 
     const normalMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(normalMatrix, modelViewMatrix);
     glMatrix.mat4.transpose(normalMatrix, normalMatrix);
 
-    const transformedPositions = new Float32Array(originalPositions); // fresh copy
+    const transformedPositions = new Float32Array(originalPositions);
 
-    // apply manual folds transformations
     for (const fold of manualFolds) {
       if (!fold.active && fold.angle === 0) continue;
 
       for (let i = 0; i < transformedPositions.length; i += 3) {
-        // use original positions for condition checking
         const originalPos = glMatrix.vec3.fromValues(
           originalPositions[i],
           originalPositions[i + 1],
@@ -484,7 +589,6 @@ async function main() {
       }
     }
 
-    // set uniforms
     gl.uniformMatrix4fv(uniformLocations.projection, false, projectionMatrix);
     gl.uniformMatrix4fv(uniformLocations.modelView, false, modelViewMatrix);
     gl.uniformMatrix4fv(uniformLocations.normalMatrix, false, normalMatrix);
@@ -492,7 +596,9 @@ async function main() {
     // render shadow plane 
     gl.uniform1i(uniformLocations.isShadow, 0);
     gl.uniform1i(uniformLocations.isFlower, 0);
-    gl.uniform3fv(uniformLocations.baseColor, [5, 6, 4.5]); // light green color
+    gl.uniform1i(uniformLocations.isParticle, 0);
+    gl.uniform3fv(uniformLocations.baseColor, [0.7, 1, 0.7]);
+
 
     gl.bindBuffer(gl.ARRAY_BUFFER, shadowPlanePositionBuffer);
     gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
@@ -502,12 +608,11 @@ async function main() {
     gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.normal);
 
-    gl.drawArrays(gl.TRIANGLES, 0, shadowPlane.positions.length / 3); // ground
+    gl.drawArrays(gl.TRIANGLES, 0, shadowPlane.positions.length / 3);
 
     // render paper shadow
     gl.uniform1i(uniformLocations.isShadow, 1);
-    gl.uniform1i(uniformLocations.isFlower, 0);
-
+    gl.uniform1i(uniformLocations.isParticle, 0);
 
     const shadowPositions = createShadowVertices(originalPositions, transformedPositions, lightWorldPos);
 
@@ -516,30 +621,30 @@ async function main() {
     gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.position);
 
-    // use paper normals for shadow (pointing up)
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.normal);
 
+    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3);
 
-    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3); // shadow on the ground
-
-    // render the paper object
+    // render the flower
     gl.uniform1i(uniformLocations.isShadow, 0);
     gl.uniform1i(uniformLocations.isFlower, 1);
-
+    gl.uniform1i(uniformLocations.isParticle, 0);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, transformedPositions, gl.DYNAMIC_DRAW);
     gl.vertexAttribPointer(attribLocations.position, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.position);
 
-    // bind normals
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.vertexAttribPointer(attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(attribLocations.normal);
 
-    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3); // paper
+    gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3);
+
+    // render particles
+    particleSystem.render(attribLocations, uniformLocations);
 
     requestAnimationFrame(render);
   }
