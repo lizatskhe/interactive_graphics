@@ -535,17 +535,19 @@ async function main() {
     const viewMatrix = glMatrix.mat4.create();
     glMatrix.mat4.invert(viewMatrix, modelViewMatrix);
 
-    const lightWorldPos = glMatrix.vec3.fromValues(
-      2 * Math.cos(time * 0.5),
-      2 + Math.sin(time * 0.3),
-      2 * Math.sin(time * 0.5)
+    // const lightWorldPos = glMatrix.vec3.fromValues(2, 2, 1); // static light source
+    const lightWorldPos = glMatrix.vec3.fromValues( // light moves around
+      2 * Math.cos(-time * 0.2),
+      2,
+      2 * Math.sin(-time * 0.2)
     );
 
-    const cameraWorldPos = glMatrix.vec3.fromValues(
-      Math.sin(time * 0.2) * 0.1,
-      0.1,
-      0.8
-    );
+    // const lightWorldPos = glMatrix.vec3.fromValues( // light moves around
+    //   1.5 * Math.cos(time * 0.2),
+    //   2,
+    //   1.0 * Math.sin(time * 0.2) + 1.5
+    // );
+
 
     const lightViewPos = glMatrix.vec3.create();
     glMatrix.vec3.transformMat4(lightViewPos, lightWorldPos, modelViewMatrix);
